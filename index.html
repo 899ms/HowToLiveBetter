@@ -177,6 +177,14 @@ html.dark .switch .sun{display:none} html.dark .switch .moon{display:block}
 .src summary::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--t3);border-bottom:1.5px solid var(--t3);transform:rotate(-45deg);transition:transform .2s;margin-right:2px}
 .src[open] summary::before{transform:rotate(45deg)}
 .src .body{padding-top:8px;font-size:13px;line-height:1.75;color:var(--t2);overflow-wrap:anywhere}
+.src summary .cnt{color:var(--t3);font-weight:400}
+/* 一条来源一行，序号挂在左边，长 URL 单独一行不挤正文 */
+.src .body ol{margin:0;padding:0;list-style:none;counter-reset:s}
+.src .body li{counter-increment:s;position:relative;padding-left:20px;margin-bottom:8px}
+.src .body li:last-child{margin-bottom:0}
+.src .body li::before{content:counter(s) ".";position:absolute;left:0;top:0;font-size:12px;color:var(--t3);font-variant-numeric:tabular-nums}
+.src .body a.url{display:block;font-size:12px;color:var(--t3)}
+.src .body a.url:hover{color:var(--brand-1)}
 
 abbr.term{text-decoration:none;border-bottom:1px dotted var(--t3);cursor:help}
 abbr.term:hover{border-bottom-color:var(--brand-1);color:var(--brand-1)}
@@ -542,13 +550,26 @@ function renderText(el, text, terms, withTerms = true){
     }
     if (m[3]){
       const [u, tail] = trimUrl(m[3]);
-      el.appendChild(mkLink(u, u)); pushText(tail);
+      const a = mkLink(u, u.replace(/^https?:\/\//, '').replace(/\/$/, ''));
+      a.className = 'url';                 // 来源里单独占一行，别的地方仍是行内链接
+      el.appendChild(a); pushText(tail);
       continue;
     }
     el.appendChild(mkLink(hrefOf(m[2]), m[1]));
   }
   pushText(text.slice(last));
   if (withTerms) termify(el);
+}
+// 来源栏是「；」串起来的若干条文献，拆成带序号的列表，一条一行
+const SRC_SPLIT_RE = /；|\s+;\s+/;
+function renderSrc(el, text, terms){
+  el.textContent = '';
+  const parts = text.split(SRC_SPLIT_RE).map(s => s.trim()).filter(Boolean);
+  if (parts.length < 2){ renderText(el, text, terms); return parts.length; }
+  const ol = document.createElement('ol');
+  for (const p of parts){ const li = document.createElement('li'); renderText(li, p, terms); ol.appendChild(li); }
+  el.appendChild(ol);
+  return parts.length;
 }
 function highlightInto(el, s, terms){
   if (!terms.length){ el.appendChild(document.createTextNode(s)); return; }
@@ -610,7 +631,7 @@ function build(sections){
           <div class="k">收益</div><div class="v gain"></div>
           <div class="k">备注</div><div class="v note"></div>
         </div>
-        <details class="src"><summary>来源</summary><div class="body"></div></details>`;
+        <details class="src"><summary>来源<span class="cnt"></span></summary><div class="body"></div></details>`;
       const badges = c.querySelector('.badges');
       const add = (cls, text) => { const t=document.createElement('span'); t.className='badge '+cls; t.textContent=text; badges.appendChild(t); };
       if (e.ratio) { const t = document.createElement('span'); t.className = 'badge r' + ({'极高':'3','高':'2','一般':'1'}[e.ratio]);
@@ -623,7 +644,7 @@ function build(sections){
       if (e.dispute) add('danger', '争议');
       if (e.todo) add('warn', '含待核实');
       block.appendChild(c);
-      const card = {e, el:c, key:null, vis:false, f:{t:c.querySelector('.t'), cost:c.querySelector('.cost'), human:c.querySelector('.human'), gain:c.querySelector('.gain'), note:c.querySelector('.note'), src:c.querySelector('.src .body'), details:c.querySelector('.src')}};
+      const card = {e, el:c, key:null, vis:false, f:{t:c.querySelector('.t'), cost:c.querySelector('.cost'), human:c.querySelector('.human'), gain:c.querySelector('.gain'), note:c.querySelector('.note'), src:c.querySelector('.src .body'), srcN:c.querySelector('.src summary .cnt'), details:c.querySelector('.src')}};
       renderCard(card, [], '');
       CARDS.push(card); CARD_OF.set(c, card); CARD_IO.observe(c);
     }
@@ -676,7 +697,8 @@ function renderCard(card, terms, key){
   if (e.human) renderText(f.human, e.human, terms);
   renderText(f.gain, e.gain, terms);
   renderText(f.note, e.note, terms);
-  renderText(f.src, e.src, terms);
+  const nSrc = renderSrc(f.src, e.src, terms);
+  f.srcN.textContent = nSrc > 1 ? ` · ${nSrc} 条` : '';
   const inBody = (e.title+e.human+e.cost+e.gain+e.note).toLowerCase();
   f.details.open = terms.length > 0 && terms.some(t => e.src.toLowerCase().includes(t)) && !terms.some(t => inBody.includes(t));
   card.key = key;
