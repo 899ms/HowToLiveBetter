@@ -143,7 +143,8 @@ html.dark .switch .sun{display:none} html.dark .switch .moon{display:block}
 .sec-h{display:flex;align-items:baseline;gap:12px;padding-top:24px;border-top:1px solid var(--divider);margin-bottom:8px}
 .sec-h h2{font-size:24px;line-height:32px;font-weight:600;letter-spacing:-.02em;margin:0}
 .sec-h .shown{margin-left:auto;font-size:13px;color:var(--t3);font-variant-numeric:tabular-nums}
-.intro{margin:0 0 20px;color:var(--t2);font-size:14px;max-width:72ch}
+.intro{margin:0 0 12px;color:var(--t2);font-size:14px;max-width:72ch}
+.intro:last-of-type{margin-bottom:20px}
 
 .card{background:var(--bg-soft);border:1px solid transparent;border-radius:12px;padding:22px 24px 18px;margin-bottom:16px;transition:border-color .25s,background .25s;content-visibility:auto;contain-intrinsic-size:300px;contain-intrinsic-size:auto 300px}
 .card:hover{border-color:var(--divider)}
@@ -413,7 +414,7 @@ function parseReadme(md){
   for (const raw of lines){
     const line = raw.trimEnd();
     let m;
-    if ((m = /^#{1,2} (\d+)\. (.+)$/.exec(line))) { flush(); sec = {n:m[1], title:m[2].trim(), intro:'', entries:[]}; sections.push(sec); continue; }
+    if ((m = /^#{1,2} (\d+)\. (.+)$/.exec(line))) { flush(); sec = {n:m[1], title:m[2].trim(), intro:[], entries:[]}; sections.push(sec); continue; }
     if (/^#{1,2} /.test(line)) { flush(); sec = null; continue; }
     if (!sec) continue;
     if ((m = /^### (\d+)\. (.+)$/.exec(line))) { flush(); entry = {sec:sec.n, n:m[1], title:m[2].trim(), cost:'', human:'', gain:'', grade:'', src:'', note:'', money:'', time:'', will:'', level:'', lens:''}; continue; }
@@ -430,7 +431,7 @@ function parseReadme(md){
       else if ((m = /^- 备注：(.*)$/.exec(line))) entry.note = m[1];
       continue;
     }
-    if (line && !sec.intro) sec.intro = line;
+    if (line) sec.intro.push(line);   // 第一条之前的每一段导读都收，不止第一段
   }
   flush();
   for (const s of sections) for (const e of s.entries){
@@ -592,8 +593,11 @@ function build(sections){
     b.innerHTML = `<span>${s.n}. ${esc(s.title)}</span><i>${s.entries.length}</i>`; fsec.appendChild(b);
 
     const block = document.createElement('section'); block.className='sec-block'; block.dataset.sec = s.n; block.id = 'sec-'+s.n;
-    block.innerHTML = `<div class="sec-h"><h2>${s.n}. ${esc(s.title)}</h2><span class="shown"><span class="k"></span> / ${s.entries.length}</span></div><p class="intro"></p>`;
-    renderText(block.querySelector('.intro'), s.intro, [], false);
+    block.innerHTML = `<div class="sec-h"><h2>${s.n}. ${esc(s.title)}</h2><span class="shown"><span class="k"></span> / ${s.entries.length}</span></div>`;
+    for (const para of s.intro){
+      const p = document.createElement('p'); p.className = 'intro';
+      renderText(p, para, [], false); block.appendChild(p);
+    }
     for (const e of s.entries){
       const id = `e-${e.sec}-${e.n}`;
       const c = document.createElement('article'); c.className='card'; c.id = id;
