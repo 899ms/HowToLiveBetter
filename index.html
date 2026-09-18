@@ -125,6 +125,9 @@ html.dark .switch .sun{display:none} html.dark .switch .moon{display:block}
 .doc-links{margin-top:8px;font-size:14px;color:var(--t3)}
 .doc-links a{margin-right:4px}
 .hint{font-size:12px;color:var(--t3);line-height:1.6;margin-top:16px}
+/* 侧栏底部广告位：图片换成新广告主的即可，尺寸按 2:1 出图，源文件在 tools/ad-*.html */
+.ad{margin-bottom:26px}
+.ad img{display:block;width:100%;height:auto;border-radius:8px;border:1px solid var(--divider)}
 .hint p{margin:4px 0}
 .backdrop{display:none}
 
@@ -276,6 +279,10 @@ abbr.term:hover{border-bottom-color:var(--brand-1);color:var(--brand-1)}
 <div class="backdrop" id="backdrop"></div>
 <div class="pop" id="pop" role="tooltip" hidden><b></b><span></span></div>
 <aside class="sidebar" id="sidebar">
+  <div class="group ad">
+    <div class="gt">广告</div>
+    <a href="https://4.mcyyy.com" target="_blank" rel="noopener"><img src="ads/mcyyy-side.webp" alt="永恒世界 Minecraft 服务器，游戏地址 1.mcyyy.com" width="624" height="312" loading="lazy"></a>
+  </div>
   <div class="group">
     <div class="gt">章节</div>
     <div class="sec-links" id="f-sec" data-dim="sec"></div>
