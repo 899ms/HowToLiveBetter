@@ -109,7 +109,21 @@ if (-not (Test-Path $chrome)) { throw "找不到 Chrome：$chrome，装在别处
 $shotProfile = Join-Path $env:TEMP ('og-shot-' + [guid]::NewGuid().ToString('N'))
 $target = Join-Path $repo 'og.png'
 $source = 'file:///' + ((Join-Path $repo 'tools\og.html') -replace '\\', '/')
-& $chrome --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --window-size=1200,630 --user-data-dir="$shotProfile" --screenshot="$target" $source | Out-Null
+$startedAt = Get-Date
+# 用 Start-Process 而不是 & 调用：Chrome 把「xxx bytes written」写在 stderr 上，
+# PowerShell 5.1 一旦让原生程序的 stderr 流进错误流，配上 ErrorActionPreference=Stop 就会误报失败
+$chromeArgs = @(
+  '--headless', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1',
+  '--window-size=1200,630', "--user-data-dir=$shotProfile", "--screenshot=$target", $source
+)
+$chromeLog = Join-Path $env:TEMP ('og-shot-' + [guid]::NewGuid().ToString('N') + '.log')
+Start-Process -FilePath $chrome -ArgumentList $chromeArgs -Wait -NoNewWindow -RedirectStandardError $chromeLog
+Remove-Item -Force $chromeLog -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force $shotProfile -ErrorAction SilentlyContinue
+
+# 自检：文件是这次写的、大小在正常区间。过了这两关就不必再打开图看，省一次读图的开销
+$png = Get-Item $target
+if ($png.LastWriteTime -lt $startedAt) { throw 'og.png 没有被这次运行写入，截图失败了' }
+if ($png.Length -lt 120KB -or $png.Length -gt 400KB) { throw "og.png 大小异常（$($png.Length) 字节），正常在 120KB 到 400KB，打开看一眼是不是渲染坏了" }
 ''
-"og.png 已重出：$((Get-Item $target).Length) 字节。用 Read 看一眼图里三个数字对不对，再和正文改动一起提交。"
+"og.png 已重出：$($png.Length) 字节，自检通过。改过 tools/og.html 的版式才需要打开图确认。"
