@@ -169,6 +169,7 @@ html.dark .switch .sun{display:none} html.dark .switch .moon{display:block}
 .rows .k{color:var(--t3);font-weight:500;font-size:13px;line-height:1.75;padding-top:1px}
 .rows .v{color:var(--t1);min-width:0;overflow-wrap:anywhere}
 .rows .v.note{color:var(--t2)}
+.rows .v strong,.human strong,.intro strong,.src .body strong{font-weight:600;color:var(--t1)}
 .src{margin-top:14px;border-top:1px solid var(--divider);padding-top:10px}
 .src summary{list-style:none;cursor:pointer;font-size:13px;font-weight:500;color:var(--t2);display:flex;align-items:center;gap:6px;user-select:none}
 .src summary::-webkit-details-marker{display:none}
@@ -438,7 +439,7 @@ function parseReadme(md){
     e.cs = (COST_W.money[e.money] ?? 0) + (COST_W.time[e.time] ?? 0) + (COST_W.will[e.will] ?? 0);
     e.ratio = e.level === '大' ? (e.cs === 0 ? '极高' : (e.cs <= 2 ? '高' : '一般'))
             : e.level === '中' ? (e.cs === 0 ? '高' : '一般') : '一般';
-    e.hay = [e.title, e.human, e.cost, e.gain, e.note, e.src, e.grade].join('\n').toLowerCase();
+    e.hay = [e.title, e.human, e.cost, e.gain, e.note, e.src, e.grade].join('\n').replace(/\*\*/g, '').toLowerCase();
   }
   return sections;
 }
@@ -517,7 +518,8 @@ function trimUrl(u){
 // Markdown 链接 [文字](地址) 或裸 URL；仓库内的相对路径指向 GitHub 上的源文件
 const REPO_BLOB = 'https://github.com/eternity4719/HowToLiveBetter/blob/main/';
 const MD_LINK_RE = /\[([^\]\n]+)\]\(([^)\s]+)\)/;
-const LINK_RE = new RegExp(MD_LINK_RE.source + '|' + URL_RE.source, 'g');
+const BOLD_RE = /\*\*([^*\n]+)\*\*/;   // 正文里的加粗，不转就会露出星号
+const LINK_RE = new RegExp([MD_LINK_RE.source, URL_RE.source, BOLD_RE.source].join('|'), 'g');
 function hrefOf(p){
   if (/^(https?:|mailto:|#)/.test(p)) return p;
   return REPO_BLOB + p.replace(/^(\.\.?\/)+/, '').split('/').map(encodeURIComponent).join('/');
@@ -532,13 +534,17 @@ function renderText(el, text, terms, withTerms = true){
   const pushText = (s) => { if (s) highlightInto(el, s, terms); };
   while ((m = LINK_RE.exec(text))){
     pushText(text.slice(last, m.index));
+    last = m.index + m[0].length;
+    if (m[4] !== undefined){
+      const b = document.createElement('strong'); highlightInto(b, m[4], terms); el.appendChild(b);
+      continue;
+    }
     if (m[3]){
       const [u, tail] = trimUrl(m[3]);
       el.appendChild(mkLink(u, u)); pushText(tail);
-    } else {
-      el.appendChild(mkLink(hrefOf(m[2]), m[1]));
+      continue;
     }
-    last = m.index + m[0].length;
+    el.appendChild(mkLink(hrefOf(m[2]), m[1]));
   }
   pushText(text.slice(last));
   if (withTerms) termify(el);
