@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, posix } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
 import { Marked } from 'marked';
-import { ROOT, REPO, SITE, TITLE, read, readBook, gitCommit, stripBackLink } from '../lib/book.mjs';
+import { ROOT, REPO, SITE, TITLE, read, readBook, gitCommit, buildStamp, stripBackLink } from '../lib/book.mjs';
 
 const OUT = resolve(ROOT, process.argv[2] ?? 'dist/HowToLiveBetter.epub');
 const RELEASE = `${REPO}/releases/download/epub-latest/HowToLiveBetter.epub`;
@@ -34,13 +34,12 @@ const pageByPath = new Map(pages.map(p => [p.src, p.file]));
 pageByPath.set('README.md', 'front.xhtml');
 
 function aboutMd() {
-  const date = NOW.toISOString().slice(0, 10);
   const commitLine = COMMIT ? `- 对应提交：[${COMMIT.slice(0, 7)}](${REPO}/commit/${COMMIT})` : '';
   return `# 版本说明
 
 这本电子书由仓库里的 Markdown 正文自动生成，正文一改就重新生成一本。手里这本的版本：
 
-- 生成日期：${date}
+- 生成时间：${buildStamp()}（北京时间）
 ${commitLine}
 - 最新版下载：${RELEASE}
 - 在线检索页（按关键词、章节、证据等级和成本筛选）：${SITE}

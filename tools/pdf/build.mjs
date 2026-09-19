@@ -6,13 +6,13 @@
 import { writeFileSync, mkdirSync, statSync } from 'node:fs';
 import { resolve, dirname, posix, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { ROOT, REPO, SITE, TITLE, read, readBook, gitCommit, stripBackLink } from '../lib/book.mjs';
+import { ROOT, REPO, SITE, TITLE, read, readBook, gitCommit, buildStamp, stripBackLink } from '../lib/book.mjs';
 
 const OUT = resolve(ROOT, process.argv[2] ?? 'dist/HowToLiveBetter.pdf');
 const WORK = resolve(ROOT, 'dist/pdf-build.md');
 const PANDOC = process.env.PANDOC ?? 'pandoc';
 const TYPST = process.env.TYPST ?? 'typst';
-const DATE = new Date().toISOString().slice(0, 10);
+const STAMP = buildStamp();          // 「（北京时间）」写在模板和版本说明里，传给 pandoc 的值保持纯 ASCII
 const COMMIT = gitCommit();
 
 const { description, frontMd, contentsMd, bookFiles, docFiles } = readBook();
@@ -35,7 +35,7 @@ function aboutMd() {
 
 这本 PDF 由仓库里的 Markdown 正文自动排版，正文一改就重新排一本。手里这本的版本：
 
-- 生成日期：${DATE}
+- 生成时间：${STAMP}（北京时间）
 ${commitLine}- 最新版下载、在线检索、提意见：${REPO}
 - 在线检索页（按关键词、章节、证据等级和成本筛选，也能存成单文件离线看）：${SITE}
 
@@ -85,7 +85,7 @@ run(PANDOC, [
   '--from=gfm+attributes', '--to=typst', '--wrap=none',
   `--template=${resolve(ROOT, 'tools/pdf/template.typ')}`,
   '-V', `booktitle=${TITLE}`, '-V', `subtitle=${description}`,
-  '-V', `builddate=${DATE}`, '-V', `commit=${COMMIT.slice(0, 7) || '未知'}`,
+  '-V', `builddate=${STAMP}`, '-V', `commit=${COMMIT.slice(0, 7) || '未知'}`,
   '-V', `site=${SITE}`, '-V', `repo=${REPO}`,
   '-o', typFile, WORK,
 ]);

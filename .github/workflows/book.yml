@@ -101,7 +101,7 @@ jobs:
         run: |
           git tag -f epub-latest
           git push -f origin epub-latest
-          notes="正文提交 ${GITHUB_SHA::7}，生成于 $(date -u +%Y-%m-%d) UTC。EPUB、PDF、离线单文件 HTML 三样，正文每次更新后自动重新生成，下载链接固定不变。"
+          notes="正文提交 ${GITHUB_SHA::7}，生成于 $(date -u -d '+8 hours' +'%Y-%m-%d %H:%M')（北京时间）。EPUB、PDF、离线单文件 HTML 三样，正文每次更新后自动重新生成，下载链接固定不变。"
           if gh release view epub-latest >/dev/null 2>&1; then
             gh release edit epub-latest --title "电子书（EPUB / PDF / 离线 HTML，自动更新）" --notes "$notes"
           else

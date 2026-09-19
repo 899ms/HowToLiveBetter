@@ -4,25 +4,11 @@
 // 站内相对链接改成线上地址，侧栏图片转成 data URI，其余一个字不动。
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
+import { ROOT, REPO, SITE, read, gitCommit, buildStamp } from '../lib/book.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = resolve(ROOT, process.argv[2] ?? 'dist/HowToLiveBetter.html');
-const REPO = 'https://github.com/eternity4719/HowToLiveBetter';
-const SITE = 'https://eternity4719.github.io/HowToLiveBetter/';
-const DATE = new Date().toISOString().slice(0, 10);
+const STAMP = buildStamp();
 const COMMIT = gitCommit();
-
-const read = p => readFileSync(resolve(ROOT, p), 'utf8');
-
-function gitCommit() {
-  try {
-    return execSync('git rev-parse HEAD', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-  } catch {
-    return process.env.GITHUB_SHA ?? '';
-  }
-}
 
 // ---------- 正文 ----------
 const readme = read('README.md');
@@ -56,7 +42,7 @@ html = html.replace(`src="${ad}"`, `src="data:image/webp;base64,${adData}"`);
 const foot = '<div class="foot">';
 must(foot, '页脚');
 const commitNote = COMMIT ? `，正文提交 ${COMMIT.slice(0, 7)}` : '';
-html = html.replace(foot, `${foot}离线副本，生成于 ${DATE}${commitNote}；正文会继续更新，以 <a href="${SITE}">在线版</a> 为准。<br>`);
+html = html.replace(foot, `${foot}离线副本，生成于 ${STAMP}（北京时间）${commitNote}；正文会继续更新，以 <a href="${SITE}">在线版</a> 为准。<br>`);
 
 // 正文要在主脚本之前就位
 const mainScript = '\n<script>\n/* ---------- 调试面板';

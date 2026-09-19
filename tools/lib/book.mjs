@@ -22,6 +22,12 @@ export function gitCommit() {
   }
 }
 
+// 正文一天可能改好几轮，只给日期分不出是哪一版，所以精确到分钟。
+// CI 跑在 UTC 上，统一按北京时间显示，免得下载的人按自己那边的日期对不上。
+export function buildStamp() {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', dateStyle: 'short', timeStyle: 'short' }).format(new Date());
+}
+
 export function stripBackLink(md) {
   return md.replace(/^\[← 回总目录\]\([^)]*\)\s*\n/, '');
 }
