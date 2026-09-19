@@ -205,6 +205,8 @@ abbr.term:hover{border-bottom-color:var(--brand-1);color:var(--brand-1)}
 .empty button:hover{border-color:var(--brand-1);color:var(--brand-1)}
 .status{color:var(--t3);padding:40px 0;text-align:center}
 .status code{font-family:var(--mono);font-size:13px;background:var(--bg-mute);padding:2px 6px;border-radius:4px}
+.status .bar{max-width:260px;height:3px;margin:14px auto 0;border-radius:2px;background:var(--bg-mute);overflow:hidden}
+.status .bar i{display:block;height:100%;width:0;border-radius:2px;background:var(--brand-1);transition:width .18s ease-out}
 .foot{margin-top:64px;padding-top:24px;border-top:1px solid var(--divider);color:var(--t3);font-size:13px;line-height:1.7}
 
 @media (max-width:960px){
@@ -369,7 +371,7 @@ abbr.term:hover{border-bottom-color:var(--brand-1);color:var(--brand-1)}
       <details class="gloss" id="gloss"><summary>看不懂的缩写和名词</summary><p>正文里带虚线的词，点一下或把鼠标放上去就有解释。全表如下。</p><dl></dl></details>
     </div>
     <div id="list">
-      <div class="status" id="status">正在读取正文 …</div>
+      <div class="status" id="status"><span id="status-t">正在读取正文 …</span><div class="bar"><i id="status-b"></i></div></div>
       <div class="empty" id="empty" hidden>
         没有匹配的条目。去掉一个筛选条件，或换个更短的关键词。
         <div><button id="reset2">清空筛选</button></div>
@@ -784,6 +786,11 @@ function wire(){
 /* ---------- 启动 ---------- */
 (async function init(){
   const status = document.getElementById('status');
+  const statusText = document.getElementById('status-t'), statusBar = document.getElementById('status-b');
+  const progress = (done, total) => {
+    statusText.textContent = `正在读取正文 ${done}/${total}`;
+    statusBar.style.width = (done / total * 100).toFixed(1) + '%';
+  };
   try {
     if (location.protocol === 'file:') throw new Error('file');
     const r = await fetch('README.md', {cache:'no-cache'});
@@ -791,10 +798,14 @@ function wire(){
     const md = await r.text();
     const files = [...new Set(Array.from(md.matchAll(/\]\((book\/[^)]+\.md)\)/g), m => m[1]))].sort();
     if (!files.length) throw new Error('empty');
+    let done = 0;
+    progress(0, files.length);
     const parts = await Promise.all(files.map(async f => {
       const res = await fetch(f, {cache:'no-cache'});
       if (!res.ok) throw new Error('http '+res.status+'：'+f);
-      return res.text();
+      const text = await res.text();
+      progress(++done, files.length);
+      return text;
     }));
     const t1 = performance.now();
     const sections = parseReadme(parts.join('\n\n'));
