@@ -3,52 +3,23 @@
 // 只依赖 marked；zip 自己写（EPUB 要求 mimetype 第一个且不压缩，通用 zip 库不一定保证）。
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, posix } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { deflateRawSync } from 'node:zlib';
-import { execSync } from 'node:child_process';
 import { Marked } from 'marked';
+import { ROOT, REPO, SITE, TITLE, read, readBook, gitCommit, stripBackLink } from '../lib/book.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = resolve(ROOT, process.argv[2] ?? 'dist/HowToLiveBetter.epub');
-const REPO = 'https://github.com/eternity4719/HowToLiveBetter';
-const SITE = 'https://eternity4719.github.io/HowToLiveBetter/';
 const RELEASE = `${REPO}/releases/download/epub-latest/HowToLiveBetter.epub`;
-const TITLE = '高性价比人生指南';
 const BOOK_ID = 'urn:uuid:5c0c1c0e-6a5c-4d2b-9b1e-7d1f0a4e8c31';
 const NOW = new Date();
 const COMMIT = gitCommit();
 
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const read = p => readFileSync(resolve(ROOT, p), 'utf8');
 const plain = html => html.replace(/<[^>]+>/g, '');
 
-function gitCommit() {
-  try {
-    return execSync('git rev-parse HEAD', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-  } catch {
-    return process.env.GITHUB_SHA ?? '';
-  }
-}
-
 // ---------- 从 README 取内容与文件清单 ----------
-const readme = read('README.md');
-const readmeLines = readme.split('\n');
-const between = (from, to) => {
-  const a = readmeLines.findIndex(l => l.startsWith(from));
-  const b = readmeLines.findIndex((l, i) => i > a && l.startsWith(to));
-  if (a < 0 || b < 0) throw new Error(`README 里找不到 ${from} 到 ${to} 这一段`);
-  return readmeLines.slice(a, b).join('\n');
-};
-const description = between('# 高性价比人生指南', '[![')
-  .split('\n').slice(1).map(l => l.replace(/<[^>]+>/g, '').trim()).filter(Boolean).join('');
-const frontMd = between('## 这本书想回答的问题', '## 目录');
-const contentsMd = between('## 目录', '## 正文')
-  .replace(/^## 目录/, '# 各节简介')
-  .split('\n\n').filter(p => !p.includes('index.html')).join('\n\n');
-const unique = arr => [...new Set(arr)];
-const bookFiles = unique([...contentsMd.matchAll(/\]\((book\/[^)#]+\.md)\)/g)].map(m => m[1]));
-const docFiles = unique([...readme.matchAll(/\]\((docs\/[^)#/]+\.md)\)/g)].map(m => m[1]));
-if (bookFiles.length === 0) throw new Error('README 目录里没找到 book/ 文件');
+const book = readBook();
+const { description, frontMd, bookFiles, docFiles } = book;
+const contentsMd = book.contentsMd.replace(/^## 目录/, '# 各节简介');
 
 // ---------- 页面清单 ----------
 // 每页：xhtml 文件名、来源 md 的仓库路径（用来解析相对链接）、md 正文
@@ -61,10 +32,6 @@ const pages = [
 ];
 const pageByPath = new Map(pages.map(p => [p.src, p.file]));
 pageByPath.set('README.md', 'front.xhtml');
-
-function stripBackLink(md) {
-  return md.replace(/^\[← 回总目录\]\([^)]*\)\s*\n/, '');
-}
 
 function aboutMd() {
   const date = NOW.toISOString().slice(0, 10);
