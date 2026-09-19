@@ -75,6 +75,7 @@ $edits = @(
   @{ File = 'README.md'; Label = '证据分级徽章'; Pattern = 'A%20(\d+)%20%C2%B7%20B%20\d+%20%C2%B7%20C%20\d+'; New = "A%20$($grade.A)%20%C2%B7%20B%20$($grade.B)%20%C2%B7%20C%20$($grade.C)" }
   @{ File = 'README.md'; Label = '文献链接徽章'; Pattern = '-(\d+)%20%E6%9D%A1%E9%93%BE%E6%8E%A5'; New = "-$links%20%E6%9D%A1%E9%93%BE%E6%8E%A5" }
   @{ File = 'README.md'; Label = '怎么读里的 A 级数'; Pattern = '大型试验的 (\d+) 条'; New = "大型试验的 $($grade.A) 条" }
+  @{ File = 'README.md'; Label = '怎么读里的极高条数'; Pattern = '勾选性价比「极高」，得到 (\d+) 条'; New = "勾选性价比「极高」，得到 $($ratio['极高']) 条" }
   @{ File = 'README.md'; Label = '证据分级段'; Pattern = '全书 (\d+) 条中 A 级 \d+ 条、B 级 \d+ 条、C 级 \d+ 条，另有 \d+ 条标注了争议、\d+ 处'; New = "全书 $entries 条中 A 级 $($grade.A) 条、B 级 $($grade.B) 条、C 级 $($grade.C) 条，另有 $dispute 条标注了争议、$todo 处" }
   @{ File = 'README.md'; Label = '性价比段'; Pattern = '全书 (\d+) 条中性价比极高 \d+ 条（\d+%）、高 \d+ 条（\d+%）、一般 \d+ 条（\d+%）'; New = "全书 $entries 条中性价比极高 $($ratio['极高']) 条（$($pct['极高'])%）、高 $($ratio['高']) 条（$($pct['高'])%）、一般 $($ratio['一般']) 条（$($pct['一般'])%）" }
   @{ File = 'index.html'; Label = '五处描述'; Pattern = '(\d+) 条建议'; New = "$entries 条建议" }
