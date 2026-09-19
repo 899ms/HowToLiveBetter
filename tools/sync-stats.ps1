@@ -101,6 +101,20 @@ foreach ($edit in $edits) {
   "  $($edit.File) $($edit.Label)：$old -> 已更新（$($found.Count) 处）"
 }
 
+# 重算交叉引用对照表：插入或删除条目会让后面的「第 X 条」集体错位，而错位后的条号
+# 往往仍在范围内（2026-09-19 第 7 节那 6 处就是），只有把「引用 → 目标标题」摊开入库，
+# diff 才看得见。放在截图之前，-NoScreenshot 也要跑到
+$node = Get-Command node -ErrorAction SilentlyContinue
+if ($node) {
+  ''
+  & $node.Source (Join-Path $PSScriptRoot 'check-refs.mjs')
+  if ($LASTEXITCODE -ne 0) { throw 'check-refs.mjs 失败' }
+  '提交前扫一眼 docs/引用对照.md 的 diff：条号没动而「指向的条目」变了，就是被顺延撞歪的引用。'
+} else {
+  ''
+  '没找到 node，跳过引用对照表；改完条目请手动跑 node tools/check-refs.mjs'
+}
+
 if ($NoScreenshot) { return }
 
 $chrome = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
