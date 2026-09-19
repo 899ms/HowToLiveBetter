@@ -681,8 +681,19 @@ function gotoItem(key){
     state.q = ''; for (const d of DIMS) state[d].clear();
     syncControls(); apply(); writeUrl();
   }
-  el.scrollIntoView({block:'center', behavior:'smooth'});
-  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  // 卡片是懒渲染的，没渲染过的那些矮一截。直接滚过去会停在半路：滚动沿途的卡片被
+  // IntersectionObserver 补渲染、高度撑开，目标又被往下推了，跨节跳时尤其明显。
+  // 所以先把目标本身渲染出来，再反复校正位置，直到两次之间不再变化（或试满 10 次）。
+  const card = CARD_OF.get(el);
+  if (card && card.key !== CUR_KEY) renderCard(card, CUR_TERMS, CUR_KEY);
+  let tries = 0, lastY = NaN;
+  const settle = () => {
+    el.scrollIntoView({block:'center'});
+    const y = Math.round(el.getBoundingClientRect().top);
+    if (++tries < 10 && y !== lastY){ lastY = y; setTimeout(settle, 50); return; }
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  };
+  settle();
 }
 document.addEventListener('click', ev => {
   const a = ev.target.closest?.('.xref');
