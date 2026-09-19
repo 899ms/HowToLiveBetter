@@ -55,9 +55,16 @@ for (const f of files) {
   const rows = [];
   let cur = 0;
 
-  // 引用前面那十几个字往往就写着它想指什么（「医疗救助（见第 11 条）」），
-  // 把它一起列出来，人工扫对照表时不用翻正文就能判断指对没有
-  const ctxOf = (line, idx) => line.slice(Math.max(0, idx - 14), idx).replace(/\|/g, '｜');
+  // 引用前面那句话往往就写着它想指什么（「医疗救助（见第 11 条）」），把整个分句
+  // 列出来，人工扫对照表时不用翻正文就能判断指对没有。
+  // 取到最近的句读为界而不是固定字数——固定 14 字曾让好几处正确引用看起来可疑
+  // （「一氧化碳见第 18 条，烧烫伤见第 13 条」截断后只剩「氧化碳」对着「烫伤」）。
+  const ctxOf = (line, idx) => {
+    const before = line.slice(0, idx);
+    let start = -1;
+    for (const p of ['。', '；', '！', '？', '：']) start = Math.max(start, before.lastIndexOf(p));
+    return before.slice(start + 1).slice(-44).replace(/\|/g, '｜');
+  };
 
   lines.forEach((line, i) => {
     const t = /^### (\d+)\./.exec(line);
@@ -74,10 +81,15 @@ for (const f of files) {
       }
     }
 
-    // 节内：本节第 X 条 / 见第 X 条 / （第 X 条）——来源栏不扫，全是法条条款号
+    // 节内：扫所有「第 X 条」，不限引导词——正文里的写法远不止「见第 X 条」，还有
+    // 「按第 1 条压胸」「判断方法同第 4 条」「先对照第 8 条」「和第 4 条二选一」，
+    // 早先只认三种引导词，这些全漏在扫描之外。来源栏整行不扫（全是法条条款号）。
     if (!FIELDS.test(line)) return;
     const stripped = line.replace(/第\s*\d+\s*节第\s*[\d、,\s]+?\s*条/g, '');
-    for (const m of stripped.matchAll(/(?:本节第|见第|（第)\s*([\d、,\s]+?)\s*条/g)) {
+    for (const m of stripped.matchAll(/第\s*([\d、,\s]+?)\s*条/g)) {
+      // 前面十几个字里出现法规名或文号的，是法条条款号不是条目引用，跳过
+      const pre = stripped.slice(Math.max(0, m.index - 16), m.index);
+      if (/法|条例|办法|规定|准则|解释|细则|号〕|〕|号，|公约|宪法/.test(pre)) continue;
       for (const x of nums(m[1])) {
         const title = self.titles.get(x);
         rows.push({ from: cur, ref: `本节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(stripped, m.index) });
