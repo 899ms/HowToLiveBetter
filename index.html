@@ -674,10 +674,36 @@ function showXref(a){
   POP.style.left = Math.max(window.scrollX + 14,
     Math.min(window.scrollX + r.left, window.scrollX + vw - POP.offsetWidth - 14)) + 'px';
 }
+// 滚到哪条，地址栏就停在哪条，随手复制 URL 就能把这一条发给别人。
+// 必须用 replaceState：滚一下推一条历史记录，后退键就彻底废了。
+let spyT = 0, spyLast = '', spyOff = false;
+function spy(){
+  if (spyOff) return;
+  clearTimeout(spyT);
+  spyT = setTimeout(() => {
+    const line = innerHeight * 0.3;        // 判定线取视口偏上三成，和人读的位置差不多
+    let hit = '', near = Infinity;
+    for (const c of CARDS){
+      // 不看 card.vis：那是 CARD_IO 维护的渲染标记，滞后于滚动。直接量一次位置，
+      // 高度为 0 的就是被筛选藏起来的，顺带一并跳过。
+      const r = c.el.getBoundingClientRect();
+      if (!r.height || r.bottom <= 0 || r.top >= innerHeight) continue;
+      if (r.top <= line && r.bottom > line){ hit = c.el.id; break; }   // 跨过判定线的优先
+      const d = Math.abs(r.top - line);
+      if (d < near){ near = d; hit = c.el.id; }
+    }
+    if (hit === spyLast) return;
+    spyLast = hit;
+    history.replaceState(history.state, '', location.pathname + location.search + (hit ? '#' + hit : ''));
+  }, 160);
+}
+addEventListener('scroll', spy, { passive: true });
+
 // 卡片是懒渲染的，没渲染过的那些矮一截。直接滚过去会停在半路：滚动沿途的卡片被
 // IntersectionObserver 补渲染、高度撑开，目标又被往下推了，跨节跳时尤其明显。
 // 所以先把目标本身渲染出来，再反复校正位置，直到两次之间不再变化（或试满 10 次）。
 function scrollToEl(el){
+  spyOff = true;                           // 校正期间别让 spy 把地址栏改成沿途的条目
   const card = CARD_OF.get(el);
   if (card && card.key !== CUR_KEY) renderCard(card, CUR_TERMS, CUR_KEY);
   let tries = 0, lastY = NaN;
@@ -686,6 +712,7 @@ function scrollToEl(el){
     const y = Math.round(el.getBoundingClientRect().top);
     if (++tries < 10 && y !== lastY){ lastY = y; setTimeout(settle, 50); return; }
     el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+    spyLast = el.id; spyOff = false;       // 停稳了地址栏就归这一条，再放 spy 回来
   };
   settle();
 }
