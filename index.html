@@ -73,6 +73,19 @@ a:hover{color:var(--brand-2);text-decoration:underline;text-underline-offset:2px
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 :focus-visible{outline:2px solid var(--brand-1);outline-offset:2px;border-radius:4px}
 mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
+/* 正文里的「第 X 条」交叉引用：点一下就地看那条说什么，不用自己翻过去 */
+.xref{color:var(--brand-1);cursor:pointer;border-bottom:1px dashed currentColor}
+.xref:hover{color:var(--brand-2);border-bottom-style:solid}
+#xref-pop{position:absolute;z-index:60;width:min(430px,calc(100vw - 28px));background:var(--bg-elv);border:1px solid var(--divider);border-radius:10px;box-shadow:var(--shadow);padding:11px 13px;font-size:13.5px;line-height:1.75}
+#xref-pop .xp-h{display:flex;align-items:flex-start;gap:8px;margin-bottom:7px}
+#xref-pop .xp-h b{flex:1;font-weight:600;line-height:1.5}
+#xref-pop .xp-h button{flex:none;border:1px solid var(--divider);background:var(--bg-soft);color:inherit;border-radius:6px;padding:2px 9px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap}
+#xref-pop .xp-h button:hover{border-color:var(--brand-1);color:var(--brand-1)}
+#xref-pop .xp-s{opacity:.62;font-size:12px;margin-bottom:5px}
+#xref-pop .xp-b{max-height:210px;overflow:auto}
+#xref-pop .xp-b+.xp-b{margin-top:8px;padding-top:8px;border-top:1px solid var(--divider)}
+.card.flash{animation:xflash 1.8s ease-out}
+@keyframes xflash{0%,35%{background:var(--brand-soft)}100%{background:transparent}}
 [hidden]{display:none!important}
 
 /* nav */
@@ -366,7 +379,7 @@ abbr.term:hover{border-bottom-color:var(--brand-1);color:var(--brand-1)}
       <h1>高性价比人生指南</h1>
       <p>每一条都回答两个问题：花掉什么，换回什么。</p>
       <p>换回的算在谁头上也分档：你自己最高，其次配偶和直系亲属，再次朋友同事，陌生人最低——最低不等于零，只是回报的指望小、要连风险一起看。</p>
-      <p>不用全做：这是一份按性价比排好的备选单，不是任务清单。挑走一两条就算数，剩下的需要时再回来查——想挑省力的，左边把「花钱」选「不花钱」、「要毅力」选「不用」，剩下的就是。作者自己也没做到其中大部分。</p>
+      <p>不用全做：这是一份按性价比排好的备选单，不是任务清单。挑走一两条就算数，剩下的需要时再回来查——想挑省力的，左边把「花钱」选「不花钱」、「要毅力」选「不用」，剩下的就是。作者自己也没做到其中大部分。正文里带虚线的「第 X 条」可以点开，就地看那条写了什么，不用自己翻过去。</p>
       <div class="stat" aria-live="polite">当前显示 <b id="cnt">–</b> 条，共 <span id="tot">–</span> 条</div>
       <div class="doc-links">长文：<a href="https://github.com/eternity4719/HowToLiveBetter/blob/main/docs/%E9%81%87%E5%88%B0%E9%99%8C%E7%94%9F%E4%BA%BA%E5%87%BA%E4%BA%8B%E8%AF%A5%E4%B8%8D%E8%AF%A5%E5%81%9C.md">遇到陌生人出事该不该停</a> · <a href="https://github.com/eternity4719/HowToLiveBetter/blob/main/docs/%E5%AE%B6%E5%BA%AD%E5%BA%94%E6%80%A5%E8%A3%85%E5%A4%87%E6%B8%85%E5%8D%95.md">家庭应急装备清单</a> · <a href="https://github.com/eternity4719/HowToLiveBetter/blob/main/docs/%E7%BB%93%E5%A9%9A%E5%88%92%E4%B8%8D%E5%88%92%E7%AE%97.md">结婚划不划算</a> · <a href="https://github.com/eternity4719/HowToLiveBetter/blob/main/docs/%E5%81%9A%E5%B9%B3%E5%8F%B0%E8%A6%81%E5%8A%9E%E5%93%AA%E4%BA%9B%E8%AF%81.md">做平台要办哪些证</a> · <a href="https://github.com/eternity4719/HowToLiveBetter/tree/main/docs/%E6%A0%B8%E5%AE%9E%E8%AE%B0%E5%BD%95">来源核实记录</a></div>
       <details class="gloss" id="gloss"><summary>看不懂的缩写和名词</summary><p>正文里带虚线的词，点一下或把鼠标放上去就有解释。全表如下。</p><dl></dl></details>
@@ -381,6 +394,10 @@ abbr.term:hover{border-bottom-color:var(--brand-1);color:var(--brand-1)}
     <div class="foot">数字口径以条目内标注为准：第 1、2 节是 ACM 或特定死因，第 3、4 节是精力/时间，第 5 节是金钱，第 7 节是金钱与保障，第 8、9 节是金钱与人身自由，互不换算。来源核实过程见 <a href="https://github.com/eternity4719/HowToLiveBetter/tree/main/docs/%E6%A0%B8%E5%AE%9E%E8%AE%B0%E5%BD%95">docs/核实记录</a>。Unlicense，公有领域。</div>
   </div>
 </main>
+
+<div id="xref-pop" hidden>
+  <div class="xp-h"><b></b><button class="xp-go" type="button">跳过去</button><button class="xp-x" type="button" aria-label="关闭">✕</button></div>
+</div>
 
 <script>
 /* ---------- 调试面板：地址后加 ?perf=1 打开，实测各步耗时 ---------- */
@@ -549,7 +566,7 @@ function renderText(el, text, terms, withTerms = true, urlsLast = false){
     if (!s) return;
     if (justHeld && /^[\s、,，]+$/.test(s)) return;
     justHeld = false;
-    highlightInto(el, s, terms);
+    xrefInto(el, s, terms);
   };
   while ((m = LINK_RE.exec(text))){
     pushText(text.slice(last, m.index));
@@ -610,6 +627,76 @@ function highlightInto(el, s, terms){
   }
 }
 
+/* ---------- 正文里的「第 X 条」变成可点的引用 ---------- */
+// 正文里到处是「见第 8 节第 16 条」「本节第 3 条」这种指路，自己翻过去很麻烦。
+// 检索页本来就把全部条目读进内存了，顺手把这些引用变成可点的，点一下就地看那条写了什么。
+// 只有能解析到真实条目的才变成链接——来源和备注里的法条条款号（「第 285 条」）解析不到，
+// 自然就留作普通文字，不用另写规则去排除。
+const ITEMS = new Map();          // '9-15' -> entry
+let CUR_SEC = '';                 // 正在渲染哪一节，供「本节第 X 条」和省掉节号的裸条号定位
+const XREF_RE = /第\s*(\d+)\s*节第\s*([\d、]+)\s*条|本节第\s*([\d、]+)\s*条|第\s*([\d、]+)\s*条/g;
+function xrefInto(el, s, terms){
+  XREF_RE.lastIndex = 0; let m, last = 0, any = false;
+  while ((m = XREF_RE.exec(s))){
+    const sec = m[1] ?? CUR_SEC;
+    const keys = (m[2] ?? m[3] ?? m[4] ?? '').split('、').map(x => `${sec}-${x.trim()}`).filter(k => ITEMS.has(k));
+    if (!keys.length) continue;
+    highlightInto(el, s.slice(last, m.index), terms);
+    const a = document.createElement('span');
+    a.className = 'xref'; a.tabIndex = 0; a.dataset.keys = keys.join(',');
+    a.textContent = m[0];
+    el.appendChild(a);
+    last = m.index + m[0].length; any = true;
+  }
+  if (!any) { highlightInto(el, s, terms); return; }
+  highlightInto(el, s.slice(last), terms);
+}
+
+const POP = document.getElementById('xref-pop');
+function showXref(a){
+  POP.querySelectorAll('.xp-b').forEach(n => n.remove());
+  POP.querySelector('.xp-h b').textContent = a.textContent;
+  const keys = a.dataset.keys.split(',');
+  for (const k of keys){
+    const e = ITEMS.get(k); if (!e) continue;
+    const b = document.createElement('div'); b.className = 'xp-b';
+    const s = document.createElement('div'); s.className = 'xp-s'; s.textContent = `第 ${e.sec} 节第 ${e.n} 条`;
+    const t = document.createElement('strong'); t.textContent = e.title;
+    b.append(s, t);
+    if (e.human){ const p = document.createElement('p'); p.style.cssText = 'margin:4px 0 0'; p.textContent = e.human; b.appendChild(p); }
+    POP.appendChild(b);
+  }
+  POP.dataset.go = keys[0];
+  POP.hidden = false;
+  const r = a.getBoundingClientRect(), vw = document.documentElement.clientWidth;
+  POP.style.top = (window.scrollY + r.bottom + 6) + 'px';
+  POP.style.left = Math.max(window.scrollX + 14,
+    Math.min(window.scrollX + r.left, window.scrollX + vw - POP.offsetWidth - 14)) + 'px';
+}
+function gotoItem(key){
+  const [sec, n] = key.split('-');
+  const el = document.getElementById(`e-${sec}-${n}`);
+  if (!el) return;
+  if (!el.offsetParent){            // 目标被筛选藏起来了，先把筛选清掉再跳
+    state.q = ''; for (const d of DIMS) state[d].clear();
+    syncControls(); apply(); writeUrl();
+  }
+  el.scrollIntoView({block:'center', behavior:'smooth'});
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
+document.addEventListener('click', ev => {
+  const a = ev.target.closest?.('.xref');
+  if (a){ showXref(a); return; }
+  if (!ev.target.closest?.('#xref-pop')) POP.hidden = true;
+});
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape') POP.hidden = true;
+  if (ev.key === 'Enter' && ev.target.classList?.contains('xref')) showXref(ev.target);
+});
+POP.querySelector('.xp-x').addEventListener('click', () => { POP.hidden = true; });
+POP.querySelector('.xp-go').addEventListener('click', () => { gotoItem(POP.dataset.go); POP.hidden = true; });
+addEventListener('resize', () => { POP.hidden = true; });
+
 const COST_W = { money:{'0':0,'少':1,'多':2}, time:{'少':0,'中':1,'多':2}, will:{'否':0,'些':1,'是':2} };
 const LENS_LABEL = {'死亡率':'换寿命','金钱':'换钱','时间':'换时间精力','自由':'换人身自由'};
 /* ---------- 构建 DOM ---------- */
@@ -629,6 +716,7 @@ const CARD_IO = new IntersectionObserver(list => {
 }, {rootMargin:'600px 0px'});
 function esc(s){ return s.replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
 function build(sections){
+  for (const s of sections) for (const e of s.entries) ITEMS.set(`${s.n}-${e.n}`, e);
   const list = document.getElementById('list');
   const fsec = document.getElementById('f-sec');
   const allBtn = document.createElement('button');
@@ -641,6 +729,7 @@ function build(sections){
 
     const block = document.createElement('section'); block.className='sec-block'; block.dataset.sec = s.n; block.id = 'sec-'+s.n;
     block.innerHTML = `<div class="sec-h"><h2>${s.n}. ${esc(s.title)}</h2><span class="shown"><span class="k"></span> / ${s.entries.length}</span></div>`;
+    CUR_SEC = s.n;
     for (const para of s.intro){
       const p = document.createElement('p'); p.className = 'intro';
       renderText(p, para, [], false); block.appendChild(p);
@@ -717,6 +806,7 @@ function syncControls(){
 // 文字只在搜索词变化时重渲染；筛选按钮只切换显隐，不碰卡片内容
 function renderCard(card, terms, key){
   const {e, f} = card;
+  CUR_SEC = e.sec;                 // 「本节第 X 条」要按这张卡片所属的节来解析
   renderText(f.t, e.title, terms);
   renderText(f.cost, e.cost, terms);
   f.human.hidden = !e.human;
