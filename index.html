@@ -910,7 +910,10 @@ function apply(){
 function wire(){
   const sb = document.getElementById('sidebar'), bd = document.getElementById('backdrop'), mb = document.getElementById('menu');
   const setMenu = (on) => { sb.classList.toggle('open', on); bd.classList.toggle('on', on); mb.setAttribute('aria-expanded', String(on)); };
-  const toTop = () => { setMenu(false); scrollTo({ top: 0 }); };
+  // 筛选变了就顺手让 spy 重算一次 hash：writeUrl 是无条件把旧 hash 拼回去的，
+  // 而滚回顶部时页面若本来就在顶部不会触发 scroll，hash 会僵在一个已经被筛掉的
+  // 条目上，拼出 ?sec=8#e-11-1 这种自相矛盾的地址。
+  const toTop = () => { setMenu(false); scrollTo({ top: 0 }); spy(); };
   document.querySelectorAll('[data-dim]').forEach(g => g.addEventListener('click', ev => {
     const b = ev.target.closest('[data-v]'); if (!b) return;
     const dim = g.dataset.dim, v = b.dataset.v, set = state[dim];
@@ -995,7 +998,14 @@ async function readText(path){
     buildGlossary(); readUrl(); wire(); apply();
     PERF.mark(`DOM 节点 ${document.getElementsByTagName('*').length}，术语 ${GLOSS.length}`);
     if (location.hash){
-      const target = document.getElementById(location.hash.slice(1));
+      let target = document.getElementById(location.hash.slice(1));
+      // 别人分享过来的地址可能带着和 hash 冲突的筛选（老版本拼出来的 ?sec=8#e-11-1），
+      // 这时按 hash 办：点链接就是要看那一条，筛选清掉。
+      if (target && !target.offsetParent){
+        state.q = ''; for (const d of DIMS) state[d].clear();
+        state.dispute = false; state.todo = false;
+        syncControls(); apply(); writeUrl();
+      }
       target?.scrollIntoView();
       // 卡片是 content-visibility:auto，首次定位后高度才准，下一帧再对一次
       if (target) requestAnimationFrame(() => target.scrollIntoView());
