@@ -785,6 +785,12 @@ function wire(){
 }
 
 /* ---------- 启动 ---------- */
+async function readText(path){
+  const res = await fetch(path, {cache:'no-cache'});
+  if (!res.ok) throw new Error('http '+res.status+'：'+path);
+  return res.text();
+}
+
 (async function init(){
   const status = document.getElementById('status');
   const statusText = document.getElementById('status-t'), statusBar = document.getElementById('status-b');
@@ -792,19 +798,22 @@ function wire(){
     statusText.textContent = `正在读取正文 ${done}/${total}`;
     statusBar.style.width = (done / total * 100).toFixed(1) + '%';
   };
+  // 离线单文件版把正文内联在 window.__CORPUS__ 里（tools/offline/build.mjs 生成），此时不发任何请求
+  const EMBED = window.__CORPUS__;
   try {
-    if (location.protocol === 'file:') throw new Error('file');
-    const r = await fetch('README.md', {cache:'no-cache'});
-    if (!r.ok) throw new Error('http '+r.status);
-    const md = await r.text();
+    if (!EMBED && location.protocol === 'file:') throw new Error('file');
+    const md = EMBED ? EMBED.readme : await readText('README.md');
     const files = [...new Set(Array.from(md.matchAll(/\]\((book\/[^)]+\.md)\)/g), m => m[1]))].sort();
     if (!files.length) throw new Error('empty');
     let done = 0;
-    progress(0, files.length);
+    if (!EMBED) progress(0, files.length);
     const parts = await Promise.all(files.map(async f => {
-      const res = await fetch(f, {cache:'no-cache'});
-      if (!res.ok) throw new Error('http '+res.status+'：'+f);
-      const text = await res.text();
+      if (EMBED) {
+        const text = EMBED.parts[f];
+        if (text === undefined) throw new Error('离线副本里缺 '+f);
+        return text;
+      }
+      const text = await readText(f);
       progress(++done, files.length);
       return text;
     }));
