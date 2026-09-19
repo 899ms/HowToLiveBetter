@@ -49,6 +49,8 @@
 
 正文按节拆成 `book/01-*.md` … `book/31-*.md`（2026-09-08 拆的，原来单文件 531 KB，超过 GitHub 渲染 Markdown 的 512 KB 上限，后面的节显示不出来也跳不了锚点）。README 只留导读、术语表和目录，新增或修改条目改对应的 book 文件；检索页 index.html 先读 README 拿目录里的文件列表，再并发读这些文件。每节文件第一行是回总目录的链接，第二行空行，第三行是 `# N. 节名`。
 
+README 开头「这本书想回答的问题」表**一节只占一行**（2026-09-19 用户定）：同一个链接贴两遍，读者要在同一个目的地上停两次，两行之间又没有逻辑差别。一节覆盖面宽就在一行里用逗号串几个问题、一个问号收尾（第 19 节「加班费、年休假该怎么算，被裁该拿多少补偿，上班受了伤怎么认定和拿钱？」是范式），不要拆成两行。当天把第 6、8、24 节原有的两行都并掉了，现在是 32 行对 32 节。
+
 电子版三样，全由 `.github/workflows/book.yml` 在 main 上正文改动后自动生成，挂到固定 Release `epub-latest`（下载链接不变，README 引用的就是它），PR 只生成校验不发布；产物都进 `dist/`（已 gitignore）。**产物本身不入库**，正文几乎天天改，提交二进制只会过时和撑大历史（2026-09-18 issue #12 定的方案）。README 的结构解析和文件清单收在 `tools/lib/book.mjs`，三套构建共用，新增节或长文不用改脚本。
 - EPUB：`tools/epub/build.mjs`（只依赖 marked，zip 自己打），CI 里跑 epubcheck。本地 `cd tools/epub && npm ci && npm run build`。
 - 离线单文件 HTML：`tools/offline/build.mjs`（零依赖）把正文内联进 index.html 的 `window.__CORPUS__`，双击就能看、离线可用；index.html 的 `init()` 认这个变量就不发请求，改 init 的取数逻辑要同时顾到这条路。
