@@ -667,23 +667,17 @@ function showXref(a){
     POP.appendChild(b);
   }
   POP.dataset.go = keys[0];
+  POP.dataset.from = a.closest('.card')?.id || '';   // 记下从哪张卡片点的，好让后退键回得来
   POP.hidden = false;
   const r = a.getBoundingClientRect(), vw = document.documentElement.clientWidth;
   POP.style.top = (window.scrollY + r.bottom + 6) + 'px';
   POP.style.left = Math.max(window.scrollX + 14,
     Math.min(window.scrollX + r.left, window.scrollX + vw - POP.offsetWidth - 14)) + 'px';
 }
-function gotoItem(key){
-  const [sec, n] = key.split('-');
-  const el = document.getElementById(`e-${sec}-${n}`);
-  if (!el) return;
-  if (!el.offsetParent){            // 目标被筛选藏起来了，先把筛选清掉再跳
-    state.q = ''; for (const d of DIMS) state[d].clear();
-    syncControls(); apply(); writeUrl();
-  }
-  // 卡片是懒渲染的，没渲染过的那些矮一截。直接滚过去会停在半路：滚动沿途的卡片被
-  // IntersectionObserver 补渲染、高度撑开，目标又被往下推了，跨节跳时尤其明显。
-  // 所以先把目标本身渲染出来，再反复校正位置，直到两次之间不再变化（或试满 10 次）。
+// 卡片是懒渲染的，没渲染过的那些矮一截。直接滚过去会停在半路：滚动沿途的卡片被
+// IntersectionObserver 补渲染、高度撑开，目标又被往下推了，跨节跳时尤其明显。
+// 所以先把目标本身渲染出来，再反复校正位置，直到两次之间不再变化（或试满 10 次）。
+function scrollToEl(el){
   const card = CARD_OF.get(el);
   if (card && card.key !== CUR_KEY) renderCard(card, CUR_TERMS, CUR_KEY);
   let tries = 0, lastY = NaN;
@@ -695,6 +689,29 @@ function gotoItem(key){
   };
   settle();
 }
+function gotoItem(key, fromId){
+  const [sec, n] = key.split('-');
+  const id = `e-${sec}-${n}`;
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!el.offsetParent){            // 目标被筛选藏起来了，先把筛选清掉再跳
+    state.q = ''; for (const d of DIMS) state[d].clear();
+    syncControls(); apply(); writeUrl();
+  }
+  // 把「从哪跳的」写进当前这条历史记录，再推一条新的，这样浏览器后退键和鼠标侧键
+  // 能回到原处。记的是来源卡片的 id 而不只是滚动条位置——往回走时沿途卡片会被补
+  // 渲染撑开，原来那个像素值早就不指向同一处了，只有按 id 重新定位才准。
+  history.replaceState({ xrefFrom: fromId || '', xrefY: window.scrollY }, '');
+  history.pushState(null, '', '#' + id);
+  scrollToEl(el);
+}
+addEventListener('popstate', ev => {
+  POP.hidden = true;
+  const st = ev.state; if (!st) return;
+  const back = st.xrefFrom && document.getElementById(st.xrefFrom);
+  if (back) scrollToEl(back);
+  else if (typeof st.xrefY === 'number') scrollTo({ top: st.xrefY });
+});
 document.addEventListener('click', ev => {
   const a = ev.target.closest?.('.xref');
   if (a){ showXref(a); return; }
@@ -705,7 +722,7 @@ document.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && ev.target.classList?.contains('xref')) showXref(ev.target);
 });
 POP.querySelector('.xp-x').addEventListener('click', () => { POP.hidden = true; });
-POP.querySelector('.xp-go').addEventListener('click', () => { gotoItem(POP.dataset.go); POP.hidden = true; });
+POP.querySelector('.xp-go').addEventListener('click', () => { gotoItem(POP.dataset.go, POP.dataset.from); POP.hidden = true; });
 addEventListener('resize', () => { POP.hidden = true; });
 
 const COST_W = { money:{'0':0,'少':1,'多':2}, time:{'少':0,'中':1,'多':2}, will:{'否':0,'些':1,'是':2} };
