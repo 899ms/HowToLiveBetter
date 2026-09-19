@@ -65,6 +65,14 @@ for (const f of files) {
     for (const p of ['。', '；', '！', '？', '：']) start = Math.max(start, before.lastIndexOf(p));
     return before.slice(start + 1).slice(-44).replace(/\|/g, '｜');
   };
+  // 引用后面的文字也算锚点：「第 16 条（借条和担保）」这种把关键词写在条号之后
+  // 取到引用后的第一个句读为止（最多 40 字）。不能用固定字符数：「见第 1 节第 7、8、
+  // 14、17、18、19、23、24、29 条（血压、血糖…）」这种长条号串会把标注挤出窗口。
+  const afterOf = (line, idx) => {
+    const rest = line.slice(idx).replace(/^第\s*\d+\s*节?第?\s*[\d、,\s]*\s*条/, '');
+    const end = rest.search(/[。；！？]/);
+    return (end === -1 ? rest : rest.slice(0, end)).slice(0, 40).replace(/\|/g, '｜');
+  };
 
   lines.forEach((line, i) => {
     const t = /^### (\d+)\./.exec(line);
@@ -76,7 +84,7 @@ for (const f of files) {
       const target = sections.get(Number(m[1]));
       for (const x of nums(m[2])) {
         const title = target?.titles.get(x);
-        rows.push({ from: cur, ref: `第 ${m[1]} 节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(line, m.index) });
+        rows.push({ from: cur, ref: `第 ${m[1]} 节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(line, m.index), after: afterOf(line, m.index) });
         if (!title) problems.push(`${f}:${i + 1} 第 ${cur} 条引用「第 ${m[1]} 节第 ${x} 条」——该节没有这一条`);
       }
     }
@@ -92,7 +100,7 @@ for (const f of files) {
       if (/法|条例|办法|规定|准则|解释|细则|号〕|〕|号，|公约|宪法/.test(pre)) continue;
       for (const x of nums(m[1])) {
         const title = self.titles.get(x);
-        rows.push({ from: cur, ref: `本节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(stripped, m.index) });
+        rows.push({ from: cur, ref: `本节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(stripped, m.index), after: afterOf(stripped, m.index) });
         // 节内引用超出本节条目数的，多半是法条条款号被误当成条目引用，列出来人工看
         if (!title) problems.push(`${f}:${i + 1} 第 ${cur} 条引用「第 ${x} 条」——本节只有 ${self.titles.size} 条（可能是法条条款号）`);
         if (x === cur) problems.push(`${f}:${i + 1} 第 ${cur} 条引用了它自己`);
@@ -100,18 +108,23 @@ for (const f of files) {
     }
   });
 
-  // 启发式查错位：引用紧挨着的那几个字通常就是它想指的东西（「医疗救助（见第 11 条）」），
-  // 若这几个字和目标标题连两个字都对不上，多半指错了，列出来人工看。会有误报
-  // （引用前是「见」「参见」这类虚词时），但能把 288 处缩小到十几处。
+  // 能不能自动验证这处引用指对了：引用前后的文字里，有没有哪两个连续汉字也出现在
+  // 目标条目标题里。有 → 这处引用自带锚点，改动导致错位时会被察觉；没有 → 它是个
+  // 裸条号（「实际算法可以看第 34 条」），错了也看不出来，需要补一个显式标注。
+  const anchored = (text, title) => {
+    for (let i = 0; i + 2 <= text.length; i++) {
+      const bg = text.slice(i, i + 2);
+      if (/^[一-龥]{2}$/.test(bg) && title.includes(bg)) return true;
+    }
+    // 数字和英文串也是锚点：12356、AED、CT、BMI、LPR 这些常常就是引用要指的东西
+    for (const tok of text.match(/[0-9A-Za-z]{2,}/g) ?? []) if (title.includes(tok)) return true;
+    return false;
+  };
   for (const r of rows) {
     if (!r.title) continue;
-    const tail = r.ctx.slice(-8);
-    let hit = false;
-    for (let i = 0; i + 2 <= tail.length && !hit; i++) {
-      const bg = tail.slice(i, i + 2);
-      if (/^[一-龥]{2}$/.test(bg) && r.title.includes(bg)) hit = true;
+    if (!anchored(r.ctx + r.after, r.title)) {
+      suspects.push(`${f}:${r.line} 第 ${r.from} 条 →「${r.ref}」${r.title.slice(0, 20)}…　…${r.ctx}【${r.ref}】${r.after}…`);
     }
-    if (!hit) suspects.push(`${f}:${r.line} 第 ${r.from} 条 →「${r.ref}」${r.title.slice(0, 22)}…　上下文：…${r.ctx}…`);
   }
 
   if (!rows.length) continue;
@@ -136,6 +149,11 @@ const body = [
   '摊开写在这里并入库：改完条目重新生成，`git diff` 里凡是条号没动而标题变了的，',
   '就是被顺延撞歪的引用。',
   '',
+  '另一道保险是**锚点**：每处引用的前后文里都得有一个词和目标条目标题对得上',
+  '（「医疗救助见第 11 条」里的「医疗救助」，或显式写成「见第 16 条（借条和担保）」）。',
+  '`node tools/check-refs.mjs --check` 会把没有锚点的裸条号判为失败——那种引用一旦',
+  '被撞歪，对照表的 diff 也看不出异常，只能靠锚点兜住。',
+  '',
   `共 ${total} 处引用。`,
   '',
   ...out,
@@ -158,8 +176,18 @@ if (process.argv.includes('--suspect') && suspects.length) {
 
 if (CHECK_ONLY) {
   const fatal = problems.filter(p => p.includes('该节没有这一条') || p.includes('引用了它自己'));
-  console.log(fatal.length ? `发现 ${fatal.length} 处失效引用` : '引用检查通过');
-  process.exit(fatal.length ? 1 : 0);
+  for (const p of fatal) console.log('  ' + p);
+  // 裸条号（引用前后没有一个词和目标标题对得上）同样算失败：这种引用一旦被条目顺延
+  // 撞歪，谁也看不出来。修法是补个锚点——「见第 16 条（借条和担保）」，
+  // 括号里的词取自目标条目标题即可。
+  if (suspects.length) {
+    console.log(`${suspects.length} 处引用是裸条号，错了看不出来，请补锚点（跑 --suspect 看清单）：`);
+    for (const s of suspects.slice(0, 10)) console.log('  ' + s.split('　')[0]);
+    if (suspects.length > 10) console.log(`  …另有 ${suspects.length - 10} 处`);
+  }
+  const bad = fatal.length + suspects.length;
+  console.log(bad ? `共 ${bad} 处要处理` : `引用检查通过：${total} 处全部指向正确，且都带锚点`);
+  process.exit(bad ? 1 : 0);
 }
 
 writeFileSync(resolve(ROOT, 'docs/引用对照.md'), body, 'utf8');
