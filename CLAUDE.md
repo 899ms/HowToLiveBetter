@@ -49,7 +49,10 @@
 
 正文按节拆成 `book/01-*.md` … `book/31-*.md`（2026-09-08 拆的，原来单文件 531 KB，超过 GitHub 渲染 Markdown 的 512 KB 上限，后面的节显示不出来也跳不了锚点）。README 只留导读、术语表和目录，新增或修改条目改对应的 book 文件；检索页 index.html 先读 README 拿目录里的文件列表，再并发读这些文件。每节文件第一行是回总目录的链接，第二行空行，第三行是 `# N. 节名`。
 
-电子书：`tools/epub/build.mjs`（只依赖 marked，zip 自己打）把 README 的导读、术语表、目录 + book/ 全部节 + docs/ 四篇长文打成 EPUB 3；文件清单从 README 的目录和长文链接里取，新增节或长文不用改脚本。`.github/workflows/epub.yml` 在 main 上正文改动后自动生成、跑 epubcheck、挂到固定 Release `epub-latest`（下载链接不变，README 里引用的就是它）；PR 只生成校验不发布。本地 `cd tools/epub && npm ci && npm run build`，产物在 `dist/`（已 gitignore）。**EPUB 文件本身不入库**，正文几乎天天改，提交二进制只会过时和撑大历史（2026-09-18 issue #12 定的方案）。
+电子版三样，全由 `.github/workflows/book.yml` 在 main 上正文改动后自动生成，挂到固定 Release `epub-latest`（下载链接不变，README 引用的就是它），PR 只生成校验不发布；产物都进 `dist/`（已 gitignore）。**产物本身不入库**，正文几乎天天改，提交二进制只会过时和撑大历史（2026-09-18 issue #12 定的方案）。README 的结构解析和文件清单收在 `tools/lib/book.mjs`，三套构建共用，新增节或长文不用改脚本。
+- EPUB：`tools/epub/build.mjs`（只依赖 marked，zip 自己打），CI 里跑 epubcheck。本地 `cd tools/epub && npm ci && npm run build`。
+- 离线单文件 HTML：`tools/offline/build.mjs`（零依赖）把正文内联进 index.html 的 `window.__CORPUS__`，双击就能看、离线可用；index.html 的 `init()` 认这个变量就不发请求，改 init 的取数逻辑要同时顾到这条路。
+- PDF：`tools/pdf/build.mjs` + `tools/pdf/template.typ`，pandoc 转 typst、typst 排版（A4、每节另起一页、页眉带节名、目录带页码、书签到条目级）。本地要 pandoc ≥ 3.1 和 typst ≥ 0.13，用环境变量 `PANDOC`、`TYPST` 指到可执行文件；CI 里按 workflow 顶部 env 里钉的版本下载。版面只改 template.typ。
 
 1. 不要早死（外因：交通、火灾、燃气器具与用气安全、毒蘑菇、溺水、跌落、中毒、疫苗、体检筛查、心理危机（12356 与限制致死手段、自杀念头的时间尺度与未遂之后的长期结局、中毒被救回来之后的不可逆后遗症、高处坠落幸存之后的 ICU 与康复账、摘掉一个肾之后剩余肾的长期代价与卖肾者的随访结局，法律那一侧在第 9 节）、家庭应急装备、安全套与不共用针具、艾滋病的免费自愿咨询检测与窗口期、肉眼血尿等该去查的信号；装备清单长文放 docs/家庭应急装备清单.md）
 2. 不要慢慢死（烟酒、运动、睡眠、饮食、久坐——只收效应量大且证据硬的，不追求全）
