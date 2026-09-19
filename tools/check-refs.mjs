@@ -19,8 +19,12 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK_ONLY = process.argv.includes('--check');
 
-// 只在这几个栏位里找引用：来源栏里的「第 N 条」几乎都是法条条款号，不是条目引用
+// 节内的裸引用（「见第 8 条」）只在这几个栏位里找：来源栏里的「第 N 条」几乎都是
+// 法条条款号，扫进来全是误报。
 const FIELDS = /^- (说人话|收益|备注|成本)：/;
+// 但带节号的跨节引用（「见第 11 节第 16 条」）不会和法条混淆，来源栏里也有，一并扫。
+// book/26 第 103 条那处「日志留存见第 11 节第 16 条」就写在来源栏里，差点漏掉。
+const CROSS_FIELDS = /^- (说人话|收益|备注|成本|来源)：/;
 
 const files = readdirSync(resolve(ROOT, 'book')).filter(f => /^\d\d-.*\.md$/.test(f)).sort();
 
@@ -58,7 +62,7 @@ for (const f of files) {
   lines.forEach((line, i) => {
     const t = /^### (\d+)\./.exec(line);
     if (t) { cur = Number(t[1]); return; }
-    if (!FIELDS.test(line)) return;
+    if (!CROSS_FIELDS.test(line)) return;
 
     // 跨节：第 N 节第 X 条
     for (const m of line.matchAll(/第\s*(\d+)\s*节第\s*([\d、,\s]+?)\s*条/g)) {
@@ -70,7 +74,8 @@ for (const f of files) {
       }
     }
 
-    // 节内：本节第 X 条 / 见第 X 条 / （第 X 条）
+    // 节内：本节第 X 条 / 见第 X 条 / （第 X 条）——来源栏不扫，全是法条条款号
+    if (!FIELDS.test(line)) return;
     const stripped = line.replace(/第\s*\d+\s*节第\s*[\d、,\s]+?\s*条/g, '');
     for (const m of stripped.matchAll(/(?:本节第|见第|（第)\s*([\d、,\s]+?)\s*条/g)) {
       for (const x of nums(m[1])) {
