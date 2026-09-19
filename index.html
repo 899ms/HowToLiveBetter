@@ -573,10 +573,24 @@ function renderText(el, text, terms, withTerms = true, urlsLast = false){
   if (withTerms) termify(el);
 }
 // 来源栏是「；」串起来的若干条文献，拆成带序号的列表，一条一行
-const SRC_SPLIT_RE = /；|\s+;\s+/;
+// 括号和引号里的分号不算分隔符：法条原文里有「……代理或者追认；……」，条款注里有「第五项，修改刑法第三百九十条；自 2024 年 3 月 1 日起施行」
+const SRC_OPEN = '「『（', SRC_CLOSE = '」』）';
+function splitSrc(text){
+  const parts = []; let buf = '', depth = 0;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (SRC_OPEN.includes(c)) depth++;
+    if (SRC_CLOSE.includes(c)) depth = Math.max(0, depth - 1);
+    const semi = c === '；' || (c === ';' && /\s/.test(text[i-1] || '') && /\s/.test(text[i+1] || ''));
+    if (semi && depth === 0){ parts.push(buf); buf = ''; continue; }
+    buf += c;
+  }
+  parts.push(buf);
+  return parts.map(s => s.trim()).filter(Boolean);
+}
 function renderSrc(el, text, terms){
   el.textContent = '';
-  const parts = text.split(SRC_SPLIT_RE).map(s => s.trim()).filter(Boolean);
+  const parts = splitSrc(text);
   if (parts.length < 2){ renderText(el, text, terms, true, true); return parts.length; }
   const ol = document.createElement('ol');
   for (const p of parts){ const li = document.createElement('li'); renderText(li, p, terms, true, true); ol.appendChild(li); }
