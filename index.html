@@ -720,6 +720,16 @@ function spy(){
   spyT = setTimeout(() => {
     const line = innerHeight * 0.3;        // 判定线取视口偏上三成，和人读的位置差不多
     let hit = '', near = Infinity;
+    // 还在页首读导读和筛选器时，没有「正在看的那一条」，地址栏就该是干净的。
+    // 否则停在最上面也会被记成 #e-1-1，一刷新就滚到第 1 节标题、导读全没了
+    // （2026-09-20 用户提的）。判据是第一个节块的顶还在判定线以下。
+    const firstBlock = BLOCKS.find(b => b.el.offsetParent)?.el;
+    if (firstBlock && firstBlock.getBoundingClientRect().top > line){
+      if (spyLast === '') return;
+      spyLast = '';
+      history.replaceState(history.state, '', location.pathname + location.search);
+      return;
+    }
     for (const c of CARDS){
       // 不看 card.vis：那是 CARD_IO 维护的渲染标记，滞后于滚动。直接量一次位置，
       // 高度为 0 的就是被筛选藏起来的，顺带一并跳过。
