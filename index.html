@@ -744,9 +744,9 @@ addEventListener('scroll', spy, { passive: true });
 // 在节当中，跳过去等于没跳（2026-09-20 用户点第 13 节撞到的）。顶部对齐靠 html 上
 // 那条 scroll-padding-top 让开吸顶导航。flash 也要分开：.flash 的样式只挂在 .card
 // 上，整块 section 加了不显示，闪的是节标题那一行。
-function scrollToEl(el, { align = 'center', flashEl = el, spyId = el.id } = {}){
+function scrollToEl(el, { align = 'center', flashEl = el, spyId = el.id, renderEl = el } = {}){
   spyOff = true;                           // 校正期间别让 spy 把地址栏改成沿途的条目
-  const card = CARD_OF.get(el);
+  const card = CARD_OF.get(renderEl);      // 滚到节块时要预渲染的是节里第一张卡片
   if (card && card.key !== CUR_KEY) renderCard(card, CUR_TERMS, CUR_KEY);
   let tries = 0, lastY = NaN;
   const settle = () => {
@@ -757,6 +757,13 @@ function scrollToEl(el, { align = 'center', flashEl = el, spyId = el.id } = {}){
     spyLast = spyId; spyOff = false;       // 停稳了地址栏就归这一条，再放 spy 回来
   };
   settle();
+}
+// 一节的第一条，滚的时候连它上面的节标题一起带进视野：整节指路落地就是这个位置，
+// 刷新、把链接发给别人也该看到同一屏。不然地址栏一样、画面不一样——点过去看得见
+// 「13. 紧急情况」，刷新之后标题在视口上面、直接从第一条开始（2026-09-20 用户提的）。
+function scrollAnchor(el){
+  const block = el.closest?.('.sec-block');
+  return block && el.id === `e-${block.dataset.sec}-1` ? block : el;
 }
 function gotoItem(key, fromId){
   const sec = key[0] === 's' ? key.slice(1) : '';
@@ -776,7 +783,14 @@ function gotoItem(key, fromId){
   // 形状——分享出去的链接也就和页面自己产生的链接对得上了。
   const first = sec ? document.getElementById(`e-${sec}-1`) : null;
   history.pushState(null, '', '#' + (first?.id || id));
-  scrollToEl(el, sec ? { align: 'start', flashEl: el.querySelector('.sec-h') || el, spyId: first?.id || id } : {});
+  if (sec){
+    scrollToEl(el, { align: 'start', flashEl: el.querySelector('.sec-h') || el, spyId: first?.id || id, renderEl: first || el });
+    return;
+  }
+  // 条目一律居中看得清上下文，只有一节的第一条例外：滚它所在的节块、顶部对齐，
+  // 这样「第 13 节」和「第 13 节第 1 条」两种指路落在同一屏，闪的还是那张卡片。
+  const anchor = scrollAnchor(el);
+  scrollToEl(anchor, anchor === el ? {} : { align: 'start', flashEl: el, spyId: el.id, renderEl: el });
 }
 addEventListener('popstate', ev => {
   POP.hidden = true;
@@ -1052,9 +1066,12 @@ async function readText(path){
         state.dispute = false; state.todo = false;
         syncControls(); apply(); writeUrl();
       }
-      target?.scrollIntoView();
+      // 落到一节的第一条时滚它所在的节块，节标题跟着进视野——和点「见第 13 节」
+      // 跳过去看到的是同一屏，地址栏也是同一个 #e-13-1
+      const land = target ? scrollAnchor(target) : null;
+      land?.scrollIntoView();
       // 卡片是 content-visibility:auto，首次定位后高度才准，下一帧再对一次
-      if (target) requestAnimationFrame(() => target.scrollIntoView());
+      if (land) requestAnimationFrame(() => land.scrollIntoView());
     }
   } catch (err) {
     status.innerHTML = err.message === 'file'
