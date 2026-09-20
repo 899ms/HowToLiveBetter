@@ -227,6 +227,8 @@ abbr.term:hover{border-bottom-color:var(--brand-1);color:var(--brand-1)}
 .status code{font-family:var(--mono);font-size:13px;background:var(--bg-mute);padding:2px 6px;border-radius:4px}
 .status .bar{max-width:260px;height:3px;margin:14px auto 0;border-radius:2px;background:var(--bg-mute);overflow:hidden}
 .status .bar i{display:block;height:100%;width:0;border-radius:2px;background:var(--brand-1);transition:width .18s ease-out}
+.status button{margin-top:14px;border:1px solid var(--divider);background:var(--bg-soft);color:var(--t1);border-radius:6px;padding:6px 16px;font:inherit;cursor:pointer}
+.status button:hover{border-color:var(--brand-1);color:var(--brand-1)}
 .foot{margin-top:64px;padding-top:24px;border-top:1px solid var(--divider);color:var(--t3);font-size:13px;line-height:1.7}
 
 @media (max-width:960px){
@@ -1026,10 +1028,38 @@ function wire(){
 }
 
 /* ---------- 启动 ---------- */
-async function readText(path){
-  const res = await fetch(path, {cache:'no-cache'});
-  if (!res.ok) throw new Error('http '+res.status+'：'+path);
-  return res.text();
+// 一次要取 README 加三十多个正文文件，手机信号差时中间掉一个，整页就全军覆没
+// （2026-09-20 用户在手机上读到一半撞到 Failed to fetch）。所以：取到的存下来，
+// 重试时不重下；网络类的失败自己先退避重试几次；再不行也只报「网络中断」并给
+// 一个接着读的按钮，别再让读者去查文件在不在——文件在不在和这种失败没关系。
+const CORPUS_CACHE = new Map();
+async function readText(path, tries = 3){
+  if (CORPUS_CACHE.has(path)) return CORPUS_CACHE.get(path);
+  for (let i = 1; ; i++){
+    let retry = false;
+    try {
+      // 信号差时请求可能挂着不返回，给它一个上限，超时按可重试处理
+      const signal = AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined;
+      const res = await fetch(path, {cache:'no-cache', signal});
+      if (!res.ok){
+        // 4xx 重试没意义（文件真不在），5xx 和 429 是服务端一时的事，值得再来一次
+        retry = res.status >= 500 || res.status === 429;
+        throw new Error('http '+res.status+'：'+path);
+      }
+      const text = await res.text();
+      CORPUS_CACHE.set(path, text);
+      return text;
+    } catch (err) {
+      // fetch 的网络失败是 TypeError，超时和中断是 DOMException
+      const net = retry || err instanceof TypeError || /^(TimeoutError|AbortError)$/.test(err.name);
+      if (!net) throw err;
+      if (i >= tries){
+        const e = new Error(`取不到 ${path}（网络中断或超时）`);
+        e.net = true; throw e;
+      }
+      await new Promise(r => setTimeout(r, 500 * i * i));   // 0.5s、2s 后再试
+    }
+  }
 }
 
 (async function init(){
@@ -1084,9 +1114,20 @@ async function readText(path){
       if (land) requestAnimationFrame(() => land.scrollIntoView());
     }
   } catch (err) {
-    status.innerHTML = err.message === 'file'
-      ? '这个页面要通过 http 打开才能读取正文。在仓库目录运行 <code>python -m http.server</code>，然后访问 <code>http://localhost:8000/</code>；或直接用 GitHub Pages 地址。'
-      : `读取正文失败（${esc(String(err.message))}）。确认 README.md 和 book/ 目录都在 index.html 旁边。`;
+    if (err.message === 'file'){
+      status.innerHTML = '这个页面要通过 http 打开才能读取正文。在仓库目录运行 <code>python -m http.server</code>，然后访问 <code>http://localhost:8000/</code>；或直接用 GitHub Pages 地址。';
+      return;
+    }
+    if (err.net){
+      status.innerHTML = `网络中断，正文只读了一部分（${esc(String(err.message))}）。已经读到的不用重下，换个网络或等信号稳一点，点这里接着读。`
+        + '<div><button type="button" id="retry">接着读</button></div>';
+      document.getElementById('retry').addEventListener('click', () => {
+        status.innerHTML = '<span id="status-t">正在读取正文 …</span><div class="bar"><i id="status-b"></i></div>';
+        init();
+      });
+      return;
+    }
+    status.innerHTML = `读取正文失败（${esc(String(err.message))}）。确认 README.md 和 book/ 目录都在 index.html 旁边。`;
   }
 })();
 </script>
