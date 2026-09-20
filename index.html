@@ -85,6 +85,7 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
 #xref-pop .xp-b{max-height:210px;overflow:auto}
 #xref-pop .xp-b+.xp-b{margin-top:8px;padding-top:8px;border-top:1px solid var(--divider)}
 .card.flash{animation:xflash 1.8s ease-out}
+.sec-h.flash{animation:xflash 1.8s ease-out;border-radius:6px}
 @keyframes xflash{0%,35%{background:var(--brand-soft)}100%{background:transparent}}
 [hidden]{display:none!important}
 
@@ -732,22 +733,28 @@ addEventListener('scroll', spy, { passive: true });
 // 卡片是懒渲染的，没渲染过的那些矮一截。直接滚过去会停在半路：滚动沿途的卡片被
 // IntersectionObserver 补渲染、高度撑开，目标又被往下推了，跨节跳时尤其明显。
 // 所以先把目标本身渲染出来，再反复校正位置，直到两次之间不再变化（或试满 10 次）。
-function scrollToEl(el){
+// 整节指路落到节首，所以对齐方式要分开：条目居中看得清上下文，整节必须顶到视口
+// 上沿——一整节有几十条、高好几屏，block:'center' 会把它的中点摆到视口中间，落点
+// 在节当中，跳过去等于没跳（2026-09-20 用户点第 13 节撞到的）。顶部对齐靠 html 上
+// 那条 scroll-padding-top 让开吸顶导航。flash 也要分开：.flash 的样式只挂在 .card
+// 上，整块 section 加了不显示，闪的是节标题那一行。
+function scrollToEl(el, { align = 'center', flashEl = el, spyId = el.id } = {}){
   spyOff = true;                           // 校正期间别让 spy 把地址栏改成沿途的条目
   const card = CARD_OF.get(el);
   if (card && card.key !== CUR_KEY) renderCard(card, CUR_TERMS, CUR_KEY);
   let tries = 0, lastY = NaN;
   const settle = () => {
-    el.scrollIntoView({block:'center'});
+    el.scrollIntoView({block: align});
     const y = Math.round(el.getBoundingClientRect().top);
     if (++tries < 10 && y !== lastY){ lastY = y; setTimeout(settle, 50); return; }
-    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
-    spyLast = el.id; spyOff = false;       // 停稳了地址栏就归这一条，再放 spy 回来
+    flashEl.classList.remove('flash'); void flashEl.offsetWidth; flashEl.classList.add('flash');
+    spyLast = spyId; spyOff = false;       // 停稳了地址栏就归这一条，再放 spy 回来
   };
   settle();
 }
 function gotoItem(key, fromId){
-  const id = key[0] === 's' ? 'sec-' + key.slice(1) : `e-${key.split('-')[0]}-${key.split('-')[1]}`;
+  const sec = key[0] === 's' ? key.slice(1) : '';
+  const id = sec ? 'sec-' + sec : `e-${key.split('-')[0]}-${key.split('-')[1]}`;
   const el = document.getElementById(id);
   if (!el) return;
   if (!el.offsetParent){            // 目标被筛选藏起来了，先把筛选清掉再跳
@@ -758,8 +765,12 @@ function gotoItem(key, fromId){
   // 能回到原处。记的是来源卡片的 id 而不只是滚动条位置——往回走时沿途卡片会被补
   // 渲染撑开，原来那个像素值早就不指向同一处了，只有按 id 重新定位才准。
   history.replaceState({ xrefFrom: fromId || '', xrefY: window.scrollY }, '');
-  history.pushState(null, '', '#' + id);
-  scrollToEl(el);
+  // 地址栏写的不是 #sec-13 而是节里第一条的 #e-13-1：spy 一滚就会把 #sec-13 换成
+  // 那个形状（刷新时也是），与其让用户看着 hash 自己变，不如从一开始就写成同一个
+  // 形状——分享出去的链接也就和页面自己产生的链接对得上了。
+  const first = sec ? document.getElementById(`e-${sec}-1`) : null;
+  history.pushState(null, '', '#' + (first?.id || id));
+  scrollToEl(el, sec ? { align: 'start', flashEl: el.querySelector('.sec-h') || el, spyId: first?.id || id } : {});
 }
 addEventListener('popstate', ev => {
   POP.hidden = true;
