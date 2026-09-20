@@ -633,11 +633,15 @@ function highlightInto(el, s, terms){
 // 只有能解析到真实条目的才变成链接——来源和备注里的法条条款号（「第 285 条」）解析不到，
 // 自然就留作普通文字，不用另写规则去排除。
 const ITEMS = new Map();          // '9-15' -> entry
+const SECS = new Map();           // '9' -> section，给「见第 9 节」这种整节指路用
 let CUR_SEC = '';                 // 正在渲染哪一节，供「本节第 X 条」和省掉节号的裸条号定位
 // 条号可以写成「第 13 条」「第 12、13 条」，也可以写成「第 8 到 10 条」这种范围。
 // 范围那种以前不认，点不动（2026-09-20 用户在第 5 节第 31 条撞到的就是它）。
 const NUMS = '[\\d、]+(?:\\s*到\\s*\\d+)?';
-const XREF_RE = new RegExp(`第\\s*(\\d+)\\s*节第\\s*(${NUMS})\\s*条|本节第\\s*(${NUMS})\\s*条|第\\s*(${NUMS})\\s*条`, 'g');
+// 最后那一段认「见第 9 节」「走第 8、9 节的法律路径」这种不带条号的整节指路，
+// 全书有 135 处，以前一律是死字（2026-09-20 用户在第 5 节撞到的「（见第 9 节）」）。
+// 它必须排在最后：前面几段先吃掉「第 9 节第 3 条」，剩下的才轮到它。
+const XREF_RE = new RegExp(`第\\s*(\\d+)\\s*节第\\s*(${NUMS})\\s*条|本节第\\s*(${NUMS})\\s*条|第\\s*(${NUMS})\\s*条|第\\s*([\\d、]+)\\s*节`, 'g');
 // 「8 到 10」摊成 8、9、10；上限 40 是防着把法条条款号那种大范围摊成几百个键
 const xrefKeys = (sec, spec) => {
   const ns = [];
@@ -655,8 +659,10 @@ const xrefKeys = (sec, spec) => {
 function xrefInto(el, s, terms){
   XREF_RE.lastIndex = 0; let m, last = 0, any = false;
   while ((m = XREF_RE.exec(s))){
-    const sec = m[1] ?? CUR_SEC;
-    const keys = xrefKeys(sec, m[2] ?? m[3] ?? m[4] ?? '');
+    // 整节指路的键写成 's9'，和条目键 '9-15' 分得开
+    const keys = m[5] != null
+      ? String(m[5]).split('、').map(x => x.trim()).filter(x => SECS.has(x)).map(x => 's' + x)
+      : xrefKeys(m[1] ?? CUR_SEC, m[2] ?? m[3] ?? m[4] ?? '');
     if (!keys.length) continue;
     highlightInto(el, s.slice(last, m.index), terms);
     const a = document.createElement('span');
@@ -675,6 +681,13 @@ function showXref(a){
   POP.querySelector('.xp-h b').textContent = a.textContent;
   const keys = a.dataset.keys.split(',');
   for (const k of keys){
+    if (k[0] === 's'){                       // 整节：给节名和条目数，点「跳过去」落到节首
+      const sec = SECS.get(k.slice(1)); if (!sec) continue;
+      const b = document.createElement('div'); b.className = 'xp-b';
+      const s = document.createElement('div'); s.className = 'xp-s'; s.textContent = `整节，共 ${sec.entries.length} 条`;
+      const t = document.createElement('strong'); t.textContent = `${sec.n}. ${sec.title}`;
+      b.append(s, t); POP.appendChild(b); continue;
+    }
     const e = ITEMS.get(k); if (!e) continue;
     const b = document.createElement('div'); b.className = 'xp-b';
     const s = document.createElement('div'); s.className = 'xp-s'; s.textContent = `第 ${e.sec} 节第 ${e.n} 条`;
@@ -734,8 +747,7 @@ function scrollToEl(el){
   settle();
 }
 function gotoItem(key, fromId){
-  const [sec, n] = key.split('-');
-  const id = `e-${sec}-${n}`;
+  const id = key[0] === 's' ? 'sec-' + key.slice(1) : `e-${key.split('-')[0]}-${key.split('-')[1]}`;
   const el = document.getElementById(id);
   if (!el) return;
   if (!el.offsetParent){            // 目标被筛选藏起来了，先把筛选清掉再跳
@@ -788,7 +800,7 @@ const CARD_IO = new IntersectionObserver(list => {
 }, {rootMargin:'600px 0px'});
 function esc(s){ return s.replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
 function build(sections){
-  for (const s of sections) for (const e of s.entries) ITEMS.set(`${s.n}-${e.n}`, e);
+  for (const s of sections){ SECS.set(s.n, s); for (const e of s.entries) ITEMS.set(`${s.n}-${e.n}`, e); }
   const list = document.getElementById('list');
   const fsec = document.getElementById('f-sec');
   const allBtn = document.createElement('button');
