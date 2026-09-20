@@ -11,7 +11,10 @@ export const SITE = 'https://eternity4719.github.io/HowToLiveBetter/';
 export const TITLE = '高性价比人生指南';
 export const RELEASE = `${REPO}/releases/download/epub-latest`;
 
-export const read = p => readFileSync(resolve(ROOT, p), 'utf8');
+// 一律按 LF 交给各套构建：Windows 上 core.autocrlf=true 检出的是 CRLF，离线版脚本
+// 拿 '\n' 写的 needle 去 index.html 里找锚点就一个都找不着，本地构建直接报「找不到
+// 主脚本的开头」（CI 是 Linux，从没碰到过）。正文解析也不必各自处理 \r。
+export const read = p => readFileSync(resolve(ROOT, p), 'utf8').replace(/\r\n/g, '\n');
 export const unique = arr => [...new Set(arr)];
 
 export function gitCommit() {
