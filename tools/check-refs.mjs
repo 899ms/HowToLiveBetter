@@ -46,6 +46,7 @@ const nums = s => s.split(/[、,]/).map(x => Number(x.trim())).filter(n => Numbe
 const out = [];
 const problems = [];
 const suspects = [];
+const weak = [];
 let total = 0;
 
 for (const f of files) {
@@ -64,6 +65,27 @@ for (const f of files) {
     let start = -1;
     for (const p of ['。', '；', '！', '？', '：']) start = Math.max(start, before.lastIndexOf(p));
     return before.slice(start + 1).slice(-44).replace(/\|/g, '｜');
+  };
+  // 验锚点时用的窗口比上面这个窄：只取引用所在的那个逗号分句。整句那么宽的窗口里
+  // 「自己」「公司」这类常见词很容易和别的条目标题偶然重合，锚点就成了假的——
+  // 2026-09-20 第 31 节插条目，第 1 条备注里「……的贷款见本节第 15 条」被顺延撞到
+  // 新条目「在家给境外公司远程干活……个税自己报」上，整句窗口里两个逗号之外的
+  // 「你自己还」撞上标题里的「个税自己报」，--check 报了通过。
+  // 分句太短时（「……，见第 11 条」这种，窗口只剩一个「见」字）往前再退一个分句，
+  // 否则会把本来正确的引用误判成裸条号。
+  // 顿号和引号、括号都不算分句边界：「含糖饮料、加工肉（本节第 3 条）」的锚点隔着顿号，
+  // 「为『比别人强一档』而加的预算见本节第 24 条」的锚点在引号里，切了都会误伤。
+  const CLAUSE = ['。', '；', '！', '？', '：', '，'];
+  const narrowOf = (line, idx) => {
+    const before = line.slice(0, idx);
+    const cut = s => {
+      let start = -1;
+      for (const p of CLAUSE) start = Math.max(start, s.lastIndexOf(p));
+      return { head: s.slice(0, start + 1), tail: s.slice(start + 1) };
+    };
+    const last = cut(before);
+    if (last.tail.replace(/[见按同和依据参照的在]/g, '').length >= 4) return last.tail.slice(-24);
+    return (cut(last.head.slice(0, -1)).tail + last.tail).slice(-24);
   };
   // 引用后面的文字也算锚点：「第 16 条（借条和担保）」这种把关键词写在条号之后
   // 取到引用后的第一个句读为止（最多 40 字）。不能用固定字符数：「见第 1 节第 7、8、
@@ -93,7 +115,7 @@ for (const f of files) {
       const target = sections.get(Number(m[1]));
       for (const x of nums(m[2])) {
         const title = target?.titles.get(x);
-        rows.push({ from: cur, ref: `第 ${m[1]} 节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(line, m.index), after: afterOf(line, m.index) });
+        rows.push({ from: cur, ref: `第 ${m[1]} 节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(line, m.index), narrow: narrowOf(line, m.index), after: afterOf(line, m.index) });
         if (!title) problems.push(`${f}:${i + 1} 第 ${cur} 条引用「第 ${m[1]} 节第 ${x} 条」——该节没有这一条`);
       }
     }
@@ -109,7 +131,7 @@ for (const f of files) {
       if (/法|条例|办法|规定|准则|解释|细则|号〕|〕|号，|公约|宪法/.test(pre)) continue;
       for (const x of nums(m[1])) {
         const title = self.titles.get(x);
-        rows.push({ from: cur, ref: `本节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(stripped, m.index), after: afterOf(stripped, m.index) });
+        rows.push({ from: cur, ref: `本节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(stripped, m.index), narrow: narrowOf(stripped, m.index), after: afterOf(stripped, m.index) });
         // 节内引用超出本节条目数的，多半是法条条款号被误当成条目引用，列出来人工看
         if (!title) problems.push(`${f}:${i + 1} 第 ${cur} 条引用「第 ${x} 条」——本节只有 ${self.titles.size} 条（可能是法条条款号）`);
         if (x === cur) problems.push(`${f}:${i + 1} 第 ${cur} 条引用了它自己`);
@@ -117,23 +139,35 @@ for (const f of files) {
     }
   });
 
-  // 能不能自动验证这处引用指对了：引用前后的文字里，有没有哪两个连续汉字也出现在
-  // 目标条目标题里。有 → 这处引用自带锚点，改动导致错位时会被察觉；没有 → 它是个
-  // 裸条号（「实际算法可以看第 34 条」），错了也看不出来，需要补一个显式标注。
-  const anchored = (text, title) => {
-    for (let i = 0; i + 2 <= text.length; i++) {
-      const bg = text.slice(i, i + 2);
-      if (/^[一-龥]{2}$/.test(bg) && title.includes(bg)) return true;
+  // 能不能自动验证这处引用指对了：引用前后的文字里，有没有一段字也出现在目标条目
+  // 标题里。有 → 这处引用自带锚点，改动导致错位时会被察觉；没有 → 它是个裸条号
+  // （「实际算法可以看第 34 条」），错了也看不出来，需要补一个显式标注。
+  // 两个汉字的重合太容易偶然发生（「自己」「公司」「时间」），所以按长度和距离分级：
+  // 整句里连着三个汉字对上（「含糖饮料」「居民医保」）算实锚点；只有两个汉字对上时，
+  // 要求它落在引用所在的分句里才算——隔着两个逗号的「你自己还」撞上标题里的
+  // 「个税自己报」，就是 2026-09-20 那处漂移蒙过检查的原因。
+  const longest = (text, title) => {
+    let best = 0;
+    for (let i = 0; i < text.length; i++) {
+      for (let n = 1; i + n <= text.length; n++) {
+        const seg = text.slice(i, i + n);
+        if (!/^[一-龥]+$/.test(seg)) break;
+        if (!title.includes(seg)) break;
+        best = Math.max(best, n);
+      }
     }
-    // 数字和英文串也是锚点：12356、AED、CT、BMI、LPR 这些常常就是引用要指的东西
-    for (const tok of text.match(/[0-9A-Za-z]{2,}/g) ?? []) if (title.includes(tok)) return true;
-    return false;
+    return best;
   };
+  // 数字和英文串也是锚点：12356、AED、CT、BMI、LPR 这些常常就是引用要指的东西
+  const token = (text, title) => (text.match(/[0-9A-Za-z]{2,}/g) ?? []).some(t => title.includes(t));
   for (const r of rows) {
     if (!r.title) continue;
-    if (!anchored(r.ctx + r.after, r.title)) {
-      suspects.push(`${f}:${r.line} 第 ${r.from} 条 →「${r.ref}」${r.title.slice(0, 20)}…　…${r.ctx}【${r.ref}】${r.after}…`);
-    }
+    const wide = r.ctx + r.after;
+    if (token(wide, r.title) || longest(wide, r.title) >= 3) continue;
+    if (longest(r.narrow + r.after, r.title) >= 2) continue;
+    // 只在分句之外撞上两个字的，按弱锚点单独列：修法和裸条号一样是补显式标注。
+    const list = longest(wide, r.title) >= 2 ? weak : suspects;
+    list.push(`${f}:${r.line} 第 ${r.from} 条 →「${r.ref}」${r.title.slice(0, 20)}…　…${r.ctx}【${r.ref}】${r.after}…`);
   }
 
   if (!rows.length) continue;
@@ -163,6 +197,12 @@ const body = [
   '`node tools/check-refs.mjs --check` 会把没有锚点的裸条号判为失败——那种引用一旦',
   '被撞歪，对照表的 diff 也看不出异常，只能靠锚点兜住。',
   '',
+  '锚点算不算数按长度和距离判：整句里连着三个汉字和标题对上（「含糖饮料」「居民医保」），',
+  '或者引用所在的那个逗号分句里有两个汉字对上，才算实锚点；只在分句之外撞上两个常见汉字',
+  '（「自己」「公司」）的，按没有锚点处理。这道加严是 2026-09-20 补的：第 31 节插条目时',
+  '「……的贷款见本节第 15 条」被顺延撞到新条目「在家给境外公司远程干活……个税自己报」上，',
+  '隔着两个逗号的「你自己还」冒充了锚点，`--check` 当时报的是通过。',
+  '',
   `共 ${total} 处引用。`,
   '',
   ...out,
@@ -174,12 +214,20 @@ if (problems.length) {
   console.log('');
 }
 
-// 这个启发式误报率极高（中文里「未遂之后的长期结局见第 30 条」指向「念头一冒出来
-// 先告诉身边的一个人」完全正确，却一个字都不重叠），288 处能报出 159 处，没有筛选
-// 价值，所以默认不输出，只留给一次性人工排查用。真正靠得住的是下面那张对照表的 diff。
+// 这个启发式当年误报率极高（中文里「未遂之后的长期结局见第 30 条」指向「念头一冒出来
+// 先告诉身边的一个人」完全正确，却一个字都不重叠），288 处能报出 159 处；后来全书 345 处
+// 引用逐一补了锚点，这两类现在正常情况下都应该是 0，报出来就是真有一处该补标注。
+// 但它只保证「错位能被察觉」，不保证「错位一定被拦下」：模拟把节内引用整体顺延一条，
+// 能当场拦下的约七成，剩下的（相邻两条讲同一件事、标题共用词）仍要靠对照表的 diff。
 if (process.argv.includes('--suspect') && suspects.length) {
   console.log(`引用处的措辞和目标标题对不上（${suspects.length} 处，误报很多，仅供人工排查参考）：`);
   for (const s of suspects) console.log('  ' + s);
+  console.log('');
+}
+
+if (process.argv.includes('--suspect') && weak.length) {
+  console.log(`锚点只在分句之外对上（${weak.length} 处，多半是常见词偶然撞上，等于没有锚点）：`);
+  for (const s of weak) console.log('  ' + s);
   console.log('');
 }
 
@@ -194,7 +242,13 @@ if (CHECK_ONLY) {
     for (const s of suspects.slice(0, 10)) console.log('  ' + s.split('　')[0]);
     if (suspects.length > 10) console.log(`  …另有 ${suspects.length - 10} 处`);
   }
-  const bad = fatal.length + suspects.length;
+  // 弱锚点同样算失败：整句里只有两个常见汉字对上、还隔着分句，等于没有锚点。
+  if (weak.length) {
+    console.log(`${weak.length} 处引用的锚点只在分句之外偶然对上，等于没有锚点，请补显式标注（跑 --suspect 看清单）：`);
+    for (const s of weak.slice(0, 10)) console.log('  ' + s.split('　')[0]);
+    if (weak.length > 10) console.log(`  …另有 ${weak.length - 10} 处`);
+  }
+  const bad = fatal.length + suspects.length + weak.length;
   console.log(bad ? `共 ${bad} 处要处理` : `引用检查通过：${total} 处全部指向正确，且都带锚点`);
   process.exit(bad ? 1 : 0);
 }
