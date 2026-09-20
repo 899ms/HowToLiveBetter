@@ -1119,8 +1119,8 @@ async function readText(path, tries = 3){
       return;
     }
     if (err.net){
-      status.innerHTML = `网络中断，正文只读了一部分（${esc(String(err.message))}）。已经读到的不用重下，换个网络或等信号稳一点，点这里接着读。`
-        + '<div><button type="button" id="retry">接着读</button></div>';
+      status.innerHTML = `加载失败：${esc(String(err.message))}`
+        + '<div><button type="button" id="retry">继续加载</button></div>';
       document.getElementById('retry').addEventListener('click', () => {
         status.innerHTML = '<span id="status-t">正在读取正文 …</span><div class="bar"><i id="status-b"></i></div>';
         init();
