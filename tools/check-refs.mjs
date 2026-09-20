@@ -79,6 +79,15 @@ for (const f of files) {
     if (t) { cur = Number(t[1]); return; }
     if (!CROSS_FIELDS.test(line)) return;
 
+    // 相对指路（「见下一条」「罚则见上一条」）一律禁掉：它不带条号，插入条目时跟着
+    // 整体平移，撞歪了对照表的 diff 也看不出来，--check 的裸条号检查更是扫不到它。
+    // 2026-09-20 一次扫描就查出三处早就指错的：HPV 疫苗条的「见下一条」指到了乳腺癌
+    // 筛查（该指宫颈癌筛查），扬言条的「罚则见上一条」指到了念头条，失业登记条的
+    // 「上一条不签主动辞职」指到了存证据条。排除「最后一条」「之后一条腿」这类误命中。
+    for (const m of line.matchAll(/(?<![最之以])(上一条|下一条|前一条|后一条|上面那条|上面这条|前面那条)/g)) {
+      problems.push(`${f}:${i + 1} 第 ${cur} 条用了相对指路「${m[1]}」——改成「第 N 条（锚点词）」`);
+    }
+
     // 跨节：第 N 节第 X 条
     for (const m of line.matchAll(/第\s*(\d+)\s*节第\s*([\d、,\s]+?)\s*条/g)) {
       const target = sections.get(Number(m[1]));
@@ -175,7 +184,7 @@ if (process.argv.includes('--suspect') && suspects.length) {
 }
 
 if (CHECK_ONLY) {
-  const fatal = problems.filter(p => p.includes('该节没有这一条') || p.includes('引用了它自己'));
+  const fatal = problems.filter(p => p.includes('该节没有这一条') || p.includes('引用了它自己') || p.includes('相对指路'));
   for (const p of fatal) console.log('  ' + p);
   // 裸条号（引用前后没有一个词和目标标题对得上）同样算失败：这种引用一旦被条目顺延
   // 撞歪，谁也看不出来。修法是补个锚点——「见第 16 条（借条和担保）」，
