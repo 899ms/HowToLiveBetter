@@ -85,7 +85,13 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
 #xref-pop .xp-b{max-height:210px;overflow:auto}
 #xref-pop .xp-b+.xp-b{margin-top:8px;padding-top:8px;border-top:1px solid var(--divider)}
 .card.flash{animation:xflash 1.8s ease-out}
-.sec-h.flash{animation:xflash 1.8s ease-out;border-radius:6px}
+/* 节标题不是卡片，不能套卡片那块底色：一行标题填上底色像个色块，也像在说「这一行
+   就是目标」，而整节指路的目标是下面一整节。标题的高亮改走文字色和上沿那条分割线，
+   时长和 .card.flash 一样，反馈还是同一套 */
+.sec-h.flash{animation:secflash-line 1.8s ease-out}
+.sec-h.flash h2{animation:secflash-text 1.8s ease-out}
+@keyframes secflash-line{0%,35%{border-top-color:var(--brand-1)}100%{border-top-color:var(--divider)}}
+@keyframes secflash-text{0%,35%{color:var(--brand-1)}100%{color:var(--t1)}}
 @keyframes xflash{0%,35%{background:var(--brand-soft)}100%{background:transparent}}
 [hidden]{display:none!important}
 
