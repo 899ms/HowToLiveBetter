@@ -27,6 +27,12 @@ const FIELDS = /^- (说人话|收益|备注|成本)：/;
 const CROSS_FIELDS = /^- (说人话|收益|备注|成本|来源)：/;
 
 const files = readdirSync(resolve(ROOT, 'book')).filter(f => /^\d\d-.*\.md$/.test(f)).sort();
+// docs/ 下的长文也扫。它们和节首引言一样，长期不在扫描范围内：条号被顺延撞歪时
+// --check 照常显示通过，对照表的 diff 里也看不到这些引用。2026-09-21 清点时
+// 三篇长文里有 23 处「第 X 节第 Y 条」，一处都没被查过。
+// 只取 docs/ 根下的 .md。子目录 docs/核实记录/ 不扫：那些文件记的是当时的核实过程，
+// 里面的条号是历史状态，不该跟着正文走。对照表自己也排除掉。
+const docs = readdirSync(resolve(ROOT, 'docs')).filter(f => f.endsWith('.md') && f !== '引用对照.md').sort();
 
 // 先把每节的条目标题读出来：sections[节号] = { file, titles: { 条号: 标题 } }
 const sections = new Map();
@@ -40,8 +46,28 @@ for (const f of files) {
   sections.set(num, { file: f, titles });
 }
 
-// 一处引用可能写成「第 3、10、11 条」，拆成多个条号
-const nums = s => s.split(/[、,]/).map(x => Number(x.trim())).filter(n => Number.isFinite(n));
+// 一处引用可能写成「第 3、10、11 条」，拆成多个条号。也认区间写法「第 11 到 14 条」
+// 「第 5 到第 10 条」：这种写法原先整处都匹配不上，等于没扫，全书有 5 处这么写的。
+const RANGE = /^\s*(\d+)\s*(?:到|至)\s*第?\s*(\d+)\s*$/;
+// 返回 [条号, 是不是区间展开来的]。区间指的是一整块条目（「泄愤那几条」「平台义务
+// 那几条」），没法给块里每一条都配一个锚点，所以展开出来的条号免验锚点——它们仍然
+// 进对照表，被顺延撞歪时靠 diff 里标题变化来发现。
+const nums = s => {
+  const out = [];
+  for (const part of s.split(/[、,]/)) {
+    const r = RANGE.exec(part);
+    if (r) {
+      const [a, b] = [Number(r[1]), Number(r[2])];
+      if (b >= a && b - a <= 30) for (let i = a; i <= b; i++) out.push([i, true]);
+      continue;
+    }
+    const n = Number(part.trim());
+    if (Number.isFinite(n)) out.push([n, false]);
+  }
+  return out;
+};
+// 条号那一段的写法：「3」「3、10」「11 到 14」「5 到第 10」
+const SPEC = '[\\d、,\\s]+?(?:(?:到|至)\\s*第?\\s*\\d+)?';
 
 const out = [];
 const problems = [];
@@ -49,12 +75,21 @@ const suspects = [];
 const weak = [];
 let total = 0;
 
-for (const f of files) {
-  const num = Number(f.slice(0, 2));
-  const self = sections.get(num);
-  const lines = readFileSync(resolve(ROOT, 'book', f), 'utf8').split(/\r?\n/);
+// 扫描单元：book/ 下每节一个，docs/ 下每篇长文一个。
+const targets = [
+  ...files.map(f => ({ f, dir: 'book', isDoc: false })),
+  ...docs.map(f => ({ f, dir: 'docs', isDoc: true })),
+];
+
+for (const { f, dir, isDoc } of targets) {
+  const num = isDoc ? 0 : Number(f.slice(0, 2));
+  const self = isDoc ? null : sections.get(num);
+  const lines = readFileSync(resolve(ROOT, dir, f), 'utf8').split(/\r?\n/);
   const rows = [];
+  // cur 是当前所在条目的条号，0 表示还没进条目（book 的节首引言、docs 的任何位置）。
+  // unit 是「出处」列显示的名字：条目写「第 N 条」，节首写「节首」，长文写最近的小标题。
   let cur = 0;
+  let unit = isDoc ? '开头' : '节首';
 
   // 引用前面那句话往往就写着它想指什么（「医疗救助（见第 11 条）」），把整个分句
   // 列出来，人工扫对照表时不用翻正文就能判断指对没有。
@@ -91,15 +126,23 @@ for (const f of files) {
   // 取到引用后的第一个句读为止（最多 40 字）。不能用固定字符数：「见第 1 节第 7、8、
   // 14、17、18、19、23、24、29 条（血压、血糖…）」这种长条号串会把标注挤出窗口。
   const afterOf = (line, idx) => {
-    const rest = line.slice(idx).replace(/^第\s*\d+\s*节?第?\s*[\d、,\s]*\s*条/, '');
+    const rest = line.slice(idx).replace(new RegExp(`^第\\s*\\d+\\s*节?第?\\s*(?:${SPEC})?\\s*条`), '');
     const end = rest.search(/[。；！？]/);
     return (end === -1 ? rest : rest.slice(0, end)).slice(0, 40).replace(/\|/g, '｜');
   };
 
   lines.forEach((line, i) => {
-    const t = /^### (\d+)\./.exec(line);
-    if (t) { cur = Number(t[1]); return; }
-    if (!CROSS_FIELDS.test(line)) return;
+    if (isDoc) {
+      const h = /^#{1,6}\s+(.+?)\s*$/.exec(line);
+      if (h) { unit = h[1].slice(0, 24); return; }
+    } else {
+      const t = /^### (\d+)\. (.*)$/.exec(line);
+      if (t) { cur = Number(t[1]); unit = `第 ${cur} 条`; return; }
+    }
+    // 条目正文只扫那几个栏位（来源栏的「第 N 条」多是法条条款号）。节首引言和长文
+    // 正文是普通段落，匹配不上栏位前缀，整行放行——它们原先就是这样被静默跳过的。
+    const inEntry = !isDoc && cur > 0;
+    if (inEntry ? !CROSS_FIELDS.test(line) : !line.trim()) return;
 
     // 相对指路（「见下一条」「罚则见上一条」）一律禁掉：它不带条号，插入条目时跟着
     // 整体平移，撞歪了对照表的 diff 也看不出来，--check 的裸条号检查更是扫不到它。
@@ -107,25 +150,30 @@ for (const f of files) {
     // 筛查（该指宫颈癌筛查），扬言条的「罚则见上一条」指到了念头条，失业登记条的
     // 「上一条不签主动辞职」指到了存证据条。排除「最后一条」「之后一条腿」这类误命中。
     for (const m of line.matchAll(/(?<![最之以])(上一条|下一条|前一条|后一条|上面那条|上面这条|前面那条)/g)) {
-      problems.push(`${f}:${i + 1} 第 ${cur} 条用了相对指路「${m[1]}」——改成「第 N 条（锚点词）」`);
+      problems.push(`${f}:${i + 1} ${unit}用了相对指路「${m[1]}」——改成「第 N 条（锚点词）」`);
     }
 
     // 跨节：第 N 节第 X 条
-    for (const m of line.matchAll(/第\s*(\d+)\s*节第\s*([\d、,\s]+?)\s*条/g)) {
+    for (const m of line.matchAll(new RegExp(`第\\s*(\\d+)\\s*节第\\s*(${SPEC})\\s*条`, 'g'))) {
       const target = sections.get(Number(m[1]));
-      for (const x of nums(m[2])) {
+      for (const [x, range] of nums(m[2])) {
         const title = target?.titles.get(x);
-        rows.push({ from: cur, ref: `第 ${m[1]} 节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(line, m.index), narrow: narrowOf(line, m.index), after: afterOf(line, m.index) });
-        if (!title) problems.push(`${f}:${i + 1} 第 ${cur} 条引用「第 ${m[1]} 节第 ${x} 条」——该节没有这一条`);
+        rows.push({ from: unit, range, ref: `第 ${m[1]} 节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(line, m.index), narrow: narrowOf(line, m.index), after: afterOf(line, m.index) });
+        if (!title) problems.push(`${f}:${i + 1} ${unit}引用「第 ${m[1]} 节第 ${x} 条」——该节没有这一条`);
       }
     }
+
+    // 长文里没有「本节」这个概念，裸的「第 N 条」在长文里指的是法条条款号，不扫。
+    if (isDoc) return;
 
     // 节内：扫所有「第 X 条」，不限引导词——正文里的写法远不止「见第 X 条」，还有
     // 「按第 1 条压胸」「判断方法同第 4 条」「先对照第 8 条」「和第 4 条二选一」，
     // 早先只认三种引导词，这些全漏在扫描之外。来源栏整行不扫（全是法条条款号）。
-    if (!FIELDS.test(line)) return;
-    const stripped = line.replace(/第\s*\d+\s*节第\s*[\d、,\s]+?\s*条/g, '');
-    for (const m of stripped.matchAll(/第\s*([\d、,\s]+?)\s*条/g)) {
+    // 节首引言不受栏位限制：那里的「第 N 条」是导读（「第 9 条算钱」「第 2 条算读书
+    // 和寿命的关系」），同样会被顺延撞歪，同样要进对照表。
+    if (inEntry && !FIELDS.test(line)) return;
+    const stripped = line.replace(new RegExp(`第\\s*\\d+\\s*节第\\s*${SPEC}\\s*条`, 'g'), '');
+    for (const m of stripped.matchAll(new RegExp(`第\\s*(${SPEC})\\s*条`, 'g'))) {
       // 判定这是法条条款号还是条目引用。2026-09-21 之前的办法是看前 16 个字里有没有
       // 「法」字，可是「办法」「查法」「法律援助」「违法解除」都带「法」，一大批真引用
       // 被连带跳过。而且是静默跳过：引用压根不进对照表，--check 没有可查的引用反而显示
@@ -140,12 +188,12 @@ for (const f of files) {
       const tail = stripped.slice(0, m.index).replace(/\s+$/, '');
       const CITE = /(《[^》]*》|〔[^〕]*〕|\d+\s*号|该(?:解释|意见|办法|规定|条例|通知|法)|[^\s，。；：、（）「」]{0,8}(?:法|条例|办法|规定|准则|细则|公约))$/;
       if (CITE.test(tail)) continue;
-      for (const x of nums(m[1])) {
+      for (const [x, range] of nums(m[1])) {
         const title = self.titles.get(x);
-        rows.push({ from: cur, ref: `本节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(stripped, m.index), narrow: narrowOf(stripped, m.index), after: afterOf(stripped, m.index) });
+        rows.push({ from: unit, range, ref: `本节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(stripped, m.index), narrow: narrowOf(stripped, m.index), after: afterOf(stripped, m.index) });
         // 节内引用超出本节条目数的，多半是法条条款号被误当成条目引用，列出来人工看
-        if (!title) problems.push(`${f}:${i + 1} 第 ${cur} 条引用「第 ${x} 条」——本节只有 ${self.titles.size} 条（可能是法条条款号）`);
-        if (x === cur) problems.push(`${f}:${i + 1} 第 ${cur} 条引用了它自己`);
+        if (!title) problems.push(`${f}:${i + 1} ${unit}引用「第 ${x} 条」——本节只有 ${self.titles.size} 条（可能是法条条款号）`);
+        if (inEntry && x === cur) problems.push(`${f}:${i + 1} 第 ${cur} 条引用了它自己`);
       }
     }
   });
@@ -172,23 +220,23 @@ for (const f of files) {
   // 数字和英文串也是锚点：12356、AED、CT、BMI、LPR 这些常常就是引用要指的东西
   const token = (text, title) => (text.match(/[0-9A-Za-z]{2,}/g) ?? []).some(t => title.includes(t));
   for (const r of rows) {
-    if (!r.title) continue;
+    if (!r.title || r.range) continue;
     const wide = r.ctx + r.after;
     if (token(wide, r.title) || longest(wide, r.title) >= 3) continue;
     if (longest(r.narrow + r.after, r.title) >= 2) continue;
     // 只在分句之外撞上两个字的，按弱锚点单独列：修法和裸条号一样是补显式标注。
     const list = longest(wide, r.title) >= 2 ? weak : suspects;
-    list.push(`${f}:${r.line} 第 ${r.from} 条 →「${r.ref}」${r.title.slice(0, 20)}…　…${r.ctx}【${r.ref}】${r.after}…`);
+    list.push(`${f}:${r.line} ${r.from} →「${r.ref}」${r.title.slice(0, 20)}…　…${r.ctx}【${r.ref}】${r.after}…`);
   }
 
   if (!rows.length) continue;
   total += rows.length;
-  out.push(`## ${basename(f, '.md')}\n`);
+  out.push(`## ${isDoc ? 'docs/' : ''}${basename(f, '.md')}\n`);
   out.push('| 出处 | 引用 | 指向的条目 | 引用处的上下文 |');
   out.push('| --- | --- | --- | --- |');
   for (const r of rows) {
     const title = r.title ? r.title : '**指向不存在的条目**';
-    out.push(`| 第 ${r.from} 条 | ${r.ref} | ${title} | …${r.ctx}… |`);
+    out.push(`| ${r.from} | ${r.ref} | ${title} | …${r.ctx}… |`);
   }
   out.push('');
 }
@@ -203,10 +251,15 @@ const body = [
   '摊开写在这里并入库：改完条目重新生成，`git diff` 里凡是条号没动而标题变了的，',
   '就是被顺延撞歪的引用。',
   '',
+  '扫描范围：`book/` 下每节的条目正文和节首引言，加上 `docs/` 下的长文。长文里没有',
+  '「本节」，裸的「第 N 条」一律当法条跳过，所以长文引用要写全「第 X 节第 Y 条」。',
+  '「出处」列里，条目写「第 N 条」，节首写「节首」，长文写最近的那个小标题。',
+  '',
   '另一道保险是**锚点**：每处引用的前后文里都得有一个词和目标条目标题对得上',
   '（「医疗救助见第 11 条」里的「医疗救助」，或显式写成「见第 16 条（借条和担保）」）。',
   '`node tools/check-refs.mjs --check` 会把没有锚点的裸条号判为失败——那种引用一旦',
-  '被撞歪，对照表的 diff 也看不出异常，只能靠锚点兜住。',
+  '被撞歪，对照表的 diff 也看不出异常，只能靠锚点兜住。区间引用（「见第 8 节第 11 到',
+  '14 条」）是例外：它指的是一整块条目，没法给块里每条都配锚点，只靠 diff 兜。',
   '',
   '锚点算不算数按长度和距离判：整句里连着三个汉字和标题对上（「含糖饮料」「居民医保」），',
   '或者引用所在的那个逗号分句里有两个汉字对上，才算实锚点；只在分句之外撞上两个常见汉字',
