@@ -41,6 +41,7 @@ function Get-Ratio([int]$cost, [string]$level) {
 }
 
 $entries = 0; $grade = @{ A = 0; B = 0; C = 0 }; $dispute = 0; $todo = 0; $links = 0
+$sections = (Get-ChildItem (Join-Path $repo 'book\*.md')).Count
 $ratio = @{ '极高' = 0; '高' = 0; '一般' = 0 }
 
 foreach ($file in (Get-ChildItem (Join-Path $repo 'book\*.md') | Sort-Object Name)) {
@@ -61,9 +62,18 @@ $tagged = $ratio['极高'] + $ratio['高'] + $ratio['一般']
 if ($tagged -ne $entries) { Write-Warning "有 $($entries - $tagged) 条缺成本标签，性价比三档对不上条目数" }
 if (($grade.A + $grade.B + $grade.C) -ne $entries) { Write-Warning '证据等级行数和条目数对不上，检查有没有条目漏写证据等级' }
 
-function Get-Pct([int]$n) { [int][math]::Round($n * 100.0 / $entries, 0, [MidpointRounding]::AwayFromZero) }
-$pct = @{ '极高' = (Get-Pct $ratio['极高']); '高' = (Get-Pct $ratio['高']); '一般' = (Get-Pct $ratio['一般']) }
-if (($pct['极高'] + $pct['高'] + $pct['一般']) -ne 100) { Write-Warning '性价比三档的百分比取整后不等于 100，README 里那句要自己看一眼' }
+# 三档百分比用最大余数法分配：先向下取整，剩下的百分点按小数部分从大到小补。
+# 三个数各自四舍五入会凑出 99 或者 101（2026-09-21 加第 33 节时碰到过），这里保证加起来正好 100。
+$pctOrder = @('极高', '高', '一般')
+$pct = @{}
+$rem = @{}
+foreach ($k in $pctOrder) {
+  $exact = $ratio[$k] * 100.0 / $entries
+  $pct[$k] = [int][math]::Floor($exact)
+  $rem[$k] = $exact - $pct[$k]
+}
+$short = 100 - ($pct['极高'] + $pct['高'] + $pct['一般'])
+foreach ($k in ($pctOrder | Sort-Object { $rem[$_] } -Descending | Select-Object -First ([math]::Max($short, 0)))) { $pct[$k]++ }
 
 "条目 $entries ｜ A $($grade.A) B $($grade.B) C $($grade.C) ｜ 争议 $dispute ｜ TODO $todo ｜ 链接 $links"
 "性价比 极高 $($ratio['极高'])（$($pct['极高'])%） 高 $($ratio['高'])（$($pct['高'])%） 一般 $($ratio['一般'])（$($pct['一般'])%）"
@@ -80,7 +90,7 @@ $edits = @(
   @{ File = 'README.md'; Label = '性价比段'; Pattern = '全书 (\d+) 条中性价比极高 \d+ 条（\d+%）、高 \d+ 条（\d+%）、一般 \d+ 条（\d+%）'; New = "全书 $entries 条中性价比极高 $($ratio['极高']) 条（$($pct['极高'])%）、高 $($ratio['高']) 条（$($pct['高'])%）、一般 $($ratio['一般']) 条（$($pct['一般'])%）" }
   @{ File = 'index.html'; Label = '五处描述'; Pattern = '(\d+) 条建议'; New = "$entries 条建议" }
   @{ File = 'index.html'; Label = 'numberOfPages'; Pattern = 'numberOfPages":(\d+)'; New = "numberOfPages`":$entries" }
-  @{ File = 'index.html'; Label = '页头条目数'; Pattern = '32 节 (\d+) 条'; New = "32 节 $entries 条" }
+  @{ File = 'index.html'; Label = '页头条目数'; Pattern = '\d+ 节 (\d+) 条'; New = "$sections 节 $entries 条" }
   @{ File = 'tools\og.html'; Label = 'og 条目数'; Pattern = '<b>(\d+)</b> 条建议'; New = "<b>$entries</b> 条建议" }
   @{ File = 'tools\og.html'; Label = 'og A 级数'; Pattern = 'A 级证据 <b>(\d+)</b> 条'; New = "A 级证据 <b>$($grade.A)</b> 条" }
   @{ File = 'tools\og.html'; Label = 'og 链接数'; Pattern = '<b>(\d+)</b> 条原始文献链接'; New = "<b>$links</b> 条原始文献链接" }
