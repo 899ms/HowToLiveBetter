@@ -1272,6 +1272,9 @@ async function dmOpen(path, from){
 document.addEventListener('click', ev => {
   const a = ev.target.closest?.('a[href]');
   if (!a || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button) return;
+  // 弹窗标题栏里那个「在 GitHub 打开」指的就是当前这篇，地址形状和被拦的一模一样，
+  // 不排掉就会被自己拦下来重开一遍，表现成「点了没反应」（2026-09-21 用户发现）
+  if (a.closest('.dm-h')) return;
   const path = docPathOf(a.href);
   if (!path) return;
   ev.preventDefault();
