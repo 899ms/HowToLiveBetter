@@ -46,5 +46,4 @@ git clone --depth 1 https://github.com/eternity4719/HowToLiveBetter.git "${TMPDI
 
 ## 改动须知
 
-- 新增或删除**节**（book/ 下的文件）时，同步 SKILL.md 第 2 步那张路由表。改条目不用动这里。
-- 改性价比档的算法时（`index.html` 里的 `COST_W` 和 `e.ratio` 两行），同步 SKILL.md 第 4 步的第 1、2 点。
+SKILL.md 里不留任何会跟着正文漂的清单和数值：节的清单去读 README 的「这本书想回答的问题」表，性价比档的算法去读 `index.html` 里的 `COST_W` 和 `e.ratio` 两行。所以增删节、改档位规则都不用动这个目录。
