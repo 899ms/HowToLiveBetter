@@ -126,9 +126,20 @@ for (const f of files) {
     if (!FIELDS.test(line)) return;
     const stripped = line.replace(/第\s*\d+\s*节第\s*[\d、,\s]+?\s*条/g, '');
     for (const m of stripped.matchAll(/第\s*([\d、,\s]+?)\s*条/g)) {
-      // 前面十几个字里出现法规名或文号的，是法条条款号不是条目引用，跳过
-      const pre = stripped.slice(Math.max(0, m.index - 16), m.index);
-      if (/法|条例|办法|规定|准则|解释|细则|号〕|〕|号，|公约|宪法/.test(pre)) continue;
+      // 判定这是法条条款号还是条目引用。2026-09-21 之前的办法是看前 16 个字里有没有
+      // 「法」字，可是「办法」「查法」「法律援助」「违法解除」都带「法」，一大批真引用
+      // 被连带跳过。而且是静默跳过：引用压根不进对照表，--check 没有可查的引用反而显示
+      // 「通过」，只能靠引用总数少了才发现。一次全量扫描查出 12 处这样的引用。
+      // 现在按两条明确的判据跳过：
+      //   ① 紧挨着「第 N 条」的是引文标记——《…》、〔…〕、「14 号」、「该解释」，
+      //      或者以法规名收尾（「治安管理处罚法第 26 条」）；
+      // 只认「紧挨着」，不按前 N 个字的模糊窗口，也不拿「是不是句首」当判据——条目引用
+      // 照样会顶在句首（「第 4 条的救助站免费管吃住」「第 7 条那张『立刻去医院』的清单」）。
+      // 代价是法条引文必须自带文件名：一句一条往下列时要写「该解释第 11 条」，不能写
+      // 「……的法院命令。第 11 条讲的是取证」靠上一句撑着。这本来也是正文的自足性要求。
+      const tail = stripped.slice(0, m.index).replace(/\s+$/, '');
+      const CITE = /(《[^》]*》|〔[^〕]*〕|\d+\s*号|该(?:解释|意见|办法|规定|条例|通知|法)|[^\s，。；：、（）「」]{0,8}(?:法|条例|办法|规定|准则|细则|公约))$/;
+      if (CITE.test(tail)) continue;
       for (const x of nums(m[1])) {
         const title = self.titles.get(x);
         rows.push({ from: cur, ref: `本节第 ${x} 条`, title, line: i + 1, ctx: ctxOf(stripped, m.index), narrow: narrowOf(stripped, m.index), after: afterOf(stripped, m.index) });
