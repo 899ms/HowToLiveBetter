@@ -210,6 +210,42 @@ abbr.term{text-decoration:none;border-bottom:1px dotted var(--t3);cursor:help}
 abbr.term:hover{border-bottom-color:var(--brand-1);color:var(--brand-1)}
 .pop{position:absolute;z-index:40;background:var(--bg-elv);border:1px solid var(--divider);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:10px 12px;font-size:13px;line-height:1.6;color:var(--t2)}
 .pop b{display:block;color:var(--t1);font-weight:600;margin-bottom:2px}
+/* 长文弹窗：点「长文」不跳 GitHub，就地打开，左侧是可点的章节目录 */
+#doc-mask{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:24px}
+#doc-mask[hidden]{display:none}
+#doc-modal{background:var(--bg);border:1px solid var(--divider);border-radius:12px;box-shadow:var(--shadow);width:min(1000px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.dm-h{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--divider);flex:none}
+.dm-h b{font-size:15px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dm-h a,.dm-h button{flex:none;border:1px solid var(--divider);background:var(--bg-soft);color:var(--t2);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;font-family:inherit;text-decoration:none;line-height:1.6}
+.dm-h a:hover,.dm-h button:hover{color:var(--t1);background:var(--bg-mute)}
+.dm-b{display:flex;min-height:0;flex:1}
+.dm-toc{width:208px;flex:none;border-right:1px solid var(--divider);overflow-y:auto;overscroll-behavior:contain;padding:12px 8px 28px;background:var(--bg-alt)}
+.dm-toc a{display:block;padding:5px 10px;border-radius:6px;color:var(--t2);font-size:13px;line-height:1.5;text-decoration:none}
+.dm-toc a:hover{background:var(--bg-mute);color:var(--t1)}
+.dm-toc a.lv3{padding-left:22px;font-size:12.5px;color:var(--t3)}
+.dm-toc a.on{color:var(--brand-1);background:var(--bg-mute);font-weight:500}
+.dm-doc{position:relative;flex:1;min-width:0;overflow-y:auto;overscroll-behavior:contain;padding:20px 30px 64px;line-height:1.8}
+.dm-doc h2{font-size:17px;font-weight:600;margin:26px 0 10px;padding-top:6px;border-top:1px solid var(--divider)}
+.dm-doc h2:first-child{border-top:0;margin-top:4px}
+.dm-doc h3{font-size:14.5px;font-weight:600;margin:18px 0 8px;color:var(--t1)}
+.dm-doc p{margin:0 0 12px;color:var(--t2)}
+.dm-doc ul,.dm-doc ol{margin:0 0 12px;padding-left:22px;color:var(--t2)}
+.dm-doc li{margin:4px 0}
+.dm-doc strong{color:var(--t1);font-weight:600}
+.dm-doc code{font-family:var(--mono);font-size:12.5px;background:var(--bg-mute);padding:2px 5px;border-radius:4px}
+.dm-doc a{color:var(--brand-1);text-decoration:none;word-break:break-all}
+.dm-doc a:hover{text-decoration:underline}
+.dm-tw{overflow-x:auto;margin:0 0 14px}
+.dm-doc table{border-collapse:collapse;font-size:13px;min-width:100%}
+.dm-doc th,.dm-doc td{border:1px solid var(--divider);padding:7px 10px;text-align:left;vertical-align:top;color:var(--t2)}
+.dm-doc th{background:var(--bg-soft);color:var(--t1);font-weight:600;white-space:nowrap}
+.dm-load{color:var(--t3);padding:24px 30px}
+@media (max-width:820px){
+  #doc-mask{padding:0}
+  #doc-modal{border-radius:0;border:0;height:100%}
+  .dm-toc{display:none}
+  .dm-doc{padding:16px 18px 56px}
+}
 .gloss{margin-top:16px;border:1px solid var(--divider);border-radius:8px;padding:0 16px;font-size:13px;color:var(--t2)}
 .gloss summary{cursor:pointer;padding:10px 0;font-weight:500;color:var(--t2);list-style:none;display:flex;align-items:center;gap:6px}
 .gloss summary::-webkit-details-marker{display:none}
@@ -414,6 +450,13 @@ abbr.term:hover{border-bottom-color:var(--brand-1);color:var(--brand-1)}
     <div class="foot">数字口径以条目内标注为准：第 1、2 节是 ACM 或特定死因，第 3、4 节是精力/时间，第 5 节是金钱，第 7 节是金钱与保障，第 8、9 节是金钱与人身自由，互不换算。来源核实过程见 <a href="https://github.com/eternity4719/HowToLiveBetter/tree/main/docs/%E6%A0%B8%E5%AE%9E%E8%AE%B0%E5%BD%95">docs/核实记录</a>。Unlicense，公有领域。</div>
   </div>
 </main>
+
+<div id="doc-mask" hidden>
+  <div id="doc-modal" role="dialog" aria-modal="true" aria-labelledby="dm-t">
+    <div class="dm-h"><b id="dm-t"></b><a id="dm-gh" target="_blank" rel="noopener">在 GitHub 打开</a><button type="button" id="dm-x" aria-label="关闭">✕</button></div>
+    <div class="dm-b"><nav class="dm-toc" id="dm-toc"></nav><div class="dm-doc" id="dm-doc"></div></div>
+  </div>
+</div>
 
 <div id="xref-pop" hidden>
   <div class="xp-h"><b></b><button class="xp-go" type="button">跳过去</button><button class="xp-x" type="button" aria-label="关闭">✕</button></div>
@@ -1086,6 +1129,157 @@ async function readText(path, tries = 3){
     }
   }
 }
+
+/* ---------- 长文弹窗 ----------
+   长文（docs/*.md）原来只能跳 GitHub：要离开页面，回来还得重新定位，而且 GitHub 上
+   的长文没有章节目录可点。这里就地渲染，左边给一份可点的目录。
+   拦的是「指向 docs/xxx.md 的 GitHub 链接」，不是某几个写死的入口——页头那行长文、
+   条目备注里 hrefOf() 转出来的相对链接，形状都是这一个，所以一处拦全部生效。 */
+const DOC_PREFIX = REPO_BLOB + 'docs/';
+function docPathOf(href){
+  if (!href || href.indexOf(DOC_PREFIX) !== 0) return null;
+  const rest = href.slice(DOC_PREFIX.length);
+  if (!/^[^/?#]+[.]md$/.test(rest)) return null;   // 目录链接（核实记录）不在其内
+  // 链接里的中文是百分号编码的，语料和 fetch 都用原名，这里要解回来
+  try { return 'docs/' + decodeURIComponent(rest); } catch (e) { return 'docs/' + rest; }
+}
+const DM = {
+  mask: document.getElementById('doc-mask'), title: document.getElementById('dm-t'),
+  gh: document.getElementById('dm-gh'), toc: document.getElementById('dm-toc'),
+  doc: document.getElementById('dm-doc'), heads: [], lastFocus: null
+};
+function dmHref(u){
+  if (/^(https?:|mailto:|#)/.test(u)) return u;
+  return REPO_BLOB + u.replace(/^(\.\.?\/)+/, '').split('/').map(encodeURIComponent).join('/');
+}
+function dmInline(s){
+  let h = esc(s);
+  h = h.replace(/`([^`]+)`/g, (m, c) => '<code>' + c + '</code>');
+  h = h.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, t, u) => '<a href="' + esc(dmHref(u)) + '" target="_blank" rel="noopener">' + t + '</a>');
+  h = h.replace(/&lt;(https?:\/\/[^\s&]+)&gt;/g, (m, u) => '<a href="' + u + '" target="_blank" rel="noopener">' + u + '</a>');
+  h = h.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  return h;
+}
+// 长文只用到标题、段落、有序无序列表和表格这几样（五篇全扫过），不引 markdown 库
+function dmRender(md){
+  const lines = md.split('\n'); const out = []; const heads = [];
+  let para = [], list = null, title = '';
+  const flushP = () => { if (para.length){ out.push('<p>' + dmInline(para.join('')) + '</p>'); para = []; } };
+  const flushL = () => { if (list){ out.push('</' + list + '>'); list = null; } };
+  const flush = () => { flushP(); flushL(); };
+  for (let i = 0; i < lines.length; i++){
+    const ln = lines[i];
+    if (/^\[← 回总目录\]/.test(ln)) continue;          // 回总目录那行在弹窗里没有意义
+    if (!ln.trim()){ flush(); continue; }
+    let m;
+    if ((m = ln.match(/^(#{1,4})\s+(.*)$/))){
+      flush();
+      const lv = m[1].length, txt = m[2].trim();
+      if (lv === 1){ title = txt; continue; }           // 一级标题拿去做弹窗标题
+      const id = 'dm-h-' + heads.length;
+      heads.push({ id, lv, txt });
+      out.push('<h' + lv + ' id="' + id + '">' + dmInline(txt) + '</h' + lv + '>');
+      continue;
+    }
+    if (ln.startsWith('|')){
+      flush();
+      const rows = [];
+      while (i < lines.length && lines[i].startsWith('|')) rows.push(lines[i++]);
+      i--;
+      const cells = r => r.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const sep = rows[1] && /^[\s|:-]+$/.test(rows[1]);
+      const head = sep ? cells(rows[0]) : null;
+      const body = rows.slice(sep ? 2 : 0).map(cells);
+      let t = '<div class="dm-tw"><table>';
+      if (head) t += '<thead><tr>' + head.map(c => '<th>' + dmInline(c) + '</th>').join('') + '</tr></thead>';
+      t += '<tbody>' + body.map(r => '<tr>' + r.map(c => '<td>' + dmInline(c) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+      out.push(t);
+      continue;
+    }
+    if ((m = ln.match(/^\s*([-*])\s+(.*)$/)) || (m = ln.match(/^\s*\d+\.\s+(.*)$/))){
+      const txt = m.length === 3 ? m[2] : m[1];
+      const want = /^\s*\d/.test(ln) ? 'ol' : 'ul';
+      flushP();
+      if (list !== want){ flushL(); out.push('<' + want + '>'); list = want; }
+      out.push('<li>' + dmInline(txt) + '</li>');
+      continue;
+    }
+    para.push(ln.trim());
+  }
+  flush();
+  return { html: out.join('\n'), heads, title };
+}
+// 标题相对滚动容器的偏移。不用 offsetTop：它算的是到最近定位祖先的距离，
+// 容器没设 position 时会算到别处去（2026-09-21 目录点了不跳就是这个原因）。
+function dmTopOf(el){
+  return el.getBoundingClientRect().top - DM.doc.getBoundingClientRect().top + DM.doc.scrollTop;
+}
+function dmSpy(){
+  const top = DM.doc.scrollTop + 90; let cur = DM.heads[0];
+  for (const h of DM.heads){ const el = document.getElementById(h.id); if (el && dmTopOf(el) <= top) cur = h; }
+  for (const a of DM.toc.children) a.classList.toggle('on', !!cur && a.dataset.id === cur.id);
+}
+let dmSpyTick = false;
+DM.doc.addEventListener('scroll', () => {
+  if (dmSpyTick) return; dmSpyTick = true;
+  requestAnimationFrame(() => { dmSpyTick = false; dmSpy(); });
+});
+function dmClose(){
+  if (DM.mask.hidden) return;
+  DM.mask.hidden = true;
+  document.body.style.overflow = '';
+  DM.lastFocus?.focus?.();
+  DM.lastFocus = null;
+}
+async function dmOpen(path, from){
+  DM.lastFocus = from || null;
+  DM.mask.hidden = false;
+  document.body.style.overflow = 'hidden';
+  DM.gh.href = dmHref(path);
+  DM.toc.textContent = ''; DM.heads = [];
+  DM.title.textContent = decodeURIComponent(path.replace(/^docs\//, '').replace(/\.md$/, ''));
+  DM.doc.innerHTML = '<div class="dm-load">正在读取 …</div>';
+  DM.doc.scrollTop = 0;
+  document.getElementById('dm-x').focus();
+  let md;
+  try {
+    md = (window.__CORPUS__ && window.__CORPUS__.docs && window.__CORPUS__.docs[path]) ?? await readText(path);
+  } catch (err) {
+    DM.doc.innerHTML = '<div class="dm-load">读不到这篇长文（' + esc(String(err.message)) + '）。'
+      + '<a href="' + esc(dmHref(path)) + '" target="_blank" rel="noopener">在 GitHub 打开</a></div>';
+    return;
+  }
+  const r = dmRender(md);
+  if (r.title) DM.title.textContent = r.title;
+  DM.doc.innerHTML = r.html;
+  DM.heads = r.heads;
+  for (const h of r.heads){
+    const a = document.createElement('a');
+    a.href = 'javascript:void 0'; a.textContent = h.txt; a.dataset.id = h.id;
+    if (h.lv >= 3) a.className = 'lv3';
+    a.addEventListener('click', ev => {
+      ev.preventDefault();
+      const el = document.getElementById(h.id);
+      // 跟随系统的「减少动态效果」：开了就直接跳，没开才滑过去
+      const soft = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (el) DM.doc.scrollTo({ top: dmTopOf(el) - 12, behavior: soft ? 'smooth' : 'auto' });
+    });
+    DM.toc.appendChild(a);
+  }
+  dmSpy();
+  if (window.gtag) gtag('event', 'doc_open', { doc: path });
+}
+document.addEventListener('click', ev => {
+  const a = ev.target.closest?.('a[href]');
+  if (!a || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button) return;
+  const path = docPathOf(a.href);
+  if (!path) return;
+  ev.preventDefault();
+  dmOpen(path, a);
+});
+document.getElementById('dm-x').addEventListener('click', dmClose);
+DM.mask.addEventListener('click', ev => { if (ev.target === DM.mask) dmClose(); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !DM.mask.hidden){ ev.stopPropagation(); dmClose(); } }, true);
 
 (async function init(){
   const status = document.getElementById('status');

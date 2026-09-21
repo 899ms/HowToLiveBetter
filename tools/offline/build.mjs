@@ -14,7 +14,14 @@ const COMMIT = gitCommit();
 const readme = read('README.md');
 const files = [...new Set([...readme.matchAll(/\]\((book\/[^)]+\.md)\)/g)].map(m => m[1]))].sort();
 if (!files.length) throw new Error('README 目录里没找到 book/ 文件，离线版会是空的');
-const corpus = { readme, parts: Object.fromEntries(files.map(f => [f, read(f)])) };
+// 长文（docs/*.md）也要带上：检索页的长文弹窗就地渲染它们，离线副本里没有就只剩
+// 一个点不开的 GitHub 链接。清单从 README 里扒，和 EPUB、PDF 两套构建用的是同一处。
+const docs = [...new Set([...readme.matchAll(/\]\((docs\/[^)#/]+\.md)\)/g)].map(m => m[1]))].sort();
+const corpus = {
+  readme,
+  parts: Object.fromEntries(files.map(f => [f, read(f)])),
+  docs: Object.fromEntries(docs.map(f => [f, read(f)])),
+};
 // </script 会提前关掉脚本标签；\/ 在 JS 字符串里就是 /，内容不变
 const corpusJson = JSON.stringify(corpus).replace(/<\/script/gi, '<\\/script');
 
@@ -60,4 +67,4 @@ html = html.replace(mainScript, `\n<script>window.__CORPUS__=${corpusJson}</scri
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, html);
 const kb = n => (n / 1024 | 0) + ' KB';
-console.log(`已生成 ${OUT}：${files.length} 个正文文件，${kb(Buffer.byteLength(html))}（其中正文 ${kb(Buffer.byteLength(corpusJson))}）`);
+console.log(`已生成 ${OUT}：${files.length} 个正文文件，长文 ${docs.length} 篇，${kb(Buffer.byteLength(html))}（其中正文 ${kb(Buffer.byteLength(corpusJson))}）`);
